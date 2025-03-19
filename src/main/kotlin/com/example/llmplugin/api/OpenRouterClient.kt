@@ -1,5 +1,6 @@
 package com.example.llmplugin.api
 
+import com.example.llmplugin.settings.ChatData
 import com.example.llmplugin.settings.LlmPluginSettings
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -10,6 +11,7 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.util.UUID
 
 /**
  * Client for communicating with the OpenRouter API.
@@ -145,14 +147,26 @@ class OpenRouterClient {
      * Creates a new chat context
      */
     fun createNewChat(): String {
-        val newChatId = "chat_${System.currentTimeMillis()}"
-        val chatName = "Chat ${settings.chats.size + 1}"
+        // Create new chat with empty message history
+        val newChat = com.example.llmplugin.settings.ChatData(
+            id = UUID.randomUUID().toString(),
+            name = "Chat ${settings.chats.size + 1}",
+            messages = mutableListOf()
+        )
         
-        // Add to settings
-        settings.addChat(newChatId, chatName)
-        settings.currentChatId = newChatId
+        // Add to beginning of chats list and make current
+        settings.chats.add(0, newChat)
+        settings.currentChatId = newChat.id
         
-        return newChatId
+        // Persistence is handled automatically by IntelliJ's PersistentStateComponent
+        
+        return newChat.id
+    }
+
+    fun addAssistantMessage(content: String) {
+        settings.getChatById(settings.currentChatId)?.messages?.add(
+            com.example.llmplugin.settings.ChatMessage("assistant", content)
+        )
     }
     
     /**

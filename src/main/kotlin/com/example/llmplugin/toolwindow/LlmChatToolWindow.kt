@@ -479,12 +479,18 @@ class LlmChatToolWindow(private val project: Project) {
         
         // Set up new chat button
         newChatButton.addActionListener {
+            // Create new chat and refresh UI state
             val newChatId = openRouterClient.createNewChat()
             updateChatContextComboBox()
+            
+            // Force selection of new chat in the combo box
+            chatContextComboBox.selectedItem = openRouterClient.getCurrentChat()
+            // Clear display and add fresh welcome message
             clearChatHistory()
+            openRouterClient.addAssistantMessage("New chat started. How can I help you?")
             addMessageToChat(
                 "Assistant",
-                "Created new chat. How can I help you?",
+                "New chat started. How can I help you?",
                 "assistant"
             )
         }
