@@ -2,6 +2,8 @@ package com.example.llmplugin.toolwindow
 
 import com.example.llmplugin.api.OpenRouterClient
 import com.example.llmplugin.parser.FileReferenceParser
+import com.example.llmplugin.settings.LlmPluginSettings
+import com.intellij.openapi.components.service
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -37,6 +39,36 @@ import java.util.UUID
 class LlmChatToolWindow(private val project: Project) {
     // Map to store code snippets by ID for copy functionality
     private val codeSnippets = mutableMapOf<String, String>()
+
+    // Get settings
+    private val settings = service<LlmPluginSettings>()
+
+    // Model selector combo box
+    private val modelSelectorComboBox = JComboBox<String>().apply {
+        // Add the available models
+        for (model in settings.availableModels) {
+            addItem(model)
+        }
+        // Add custom models
+        for (model in settings.customModels) {
+            addItem(model)
+        }
+
+        // Set the selected model
+        selectedItem = settings.selectedModel
+
+        // Listen for changes
+        addActionListener {
+            val selectedModel = selectedItem as String
+            settings.selectedModel = selectedModel
+        }
+
+        // Style the combobox
+        maximumSize = Dimension(250, 30)
+        preferredSize = Dimension(250, 30)
+        background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
+        foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+    }
 
     // Components
     private val chatHistoryPane = JTextPane().apply {
@@ -366,7 +398,7 @@ class LlmChatToolWindow(private val project: Project) {
         panel.background =
             if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
 
-        // Add header panel with title
+        // Add header panel with title and model selector
         val headerPanel = JPanel(BorderLayout()).apply {
             background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
                 Color(0xF5F5F5), Color(0xF5F5F5)
@@ -384,7 +416,21 @@ class LlmChatToolWindow(private val project: Project) {
             title.border = EmptyBorder(0, 15, 0, 0)
 
             add(title, BorderLayout.WEST)
+
+            // Add model selector to the right side of the header
+            val modelPanel = JPanel(FlowLayout(FlowLayout.RIGHT)).apply {
+                background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                    Color(0xF5F5F5), Color(0xF5F5F5)
+                )
+                add(JLabel("Model:").apply {
+                    foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
+                })
+                add(modelSelectorComboBox)
+            }
+            add(modelPanel, BorderLayout.EAST)
         }
+
+        panel.add(headerPanel, BorderLayout.NORTH)
 
         panel.add(headerPanel, BorderLayout.NORTH)
 
