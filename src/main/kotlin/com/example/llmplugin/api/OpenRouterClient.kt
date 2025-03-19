@@ -54,8 +54,8 @@ class OpenRouterClient {
         val content: String
     )
     
-    // Store message history for each chat context
-    private val chatHistories = mutableMapOf<String, MutableList<Pair<String, String>>>()
+    // We'll use the settings service to store chat histories
+    private val settings = service<LlmPluginSettings>()
     
     /**
      * Sends a prompt to the OpenRouter API and handles the response.
@@ -76,19 +76,20 @@ class OpenRouterClient {
         // Build the system message with file contents
         val systemMessage = buildSystemMessage(fileContents)
         
-        // Get current chat ID
+        // Get current chat
         val chatId = settings.currentChatId
+        var chat = settings.getChatById(chatId)
         
-        // Initialize chat history for this chat ID if it doesn't exist
-        if (!chatHistories.containsKey(chatId)) {
-            chatHistories[chatId] = mutableListOf()
+        // If chat doesn't exist, create it
+        if (chat == null) {
+            chat = settings.addChat(chatId, "Chat $chatId")
         }
         
-        // Get the message history for the current chat
-        val messageHistory = chatHistories[chatId]!!
+        // Add user message to chat history
+        chat.messages.add(com.example.llmplugin.settings.ChatMessage(role = "user", content = prompt))
         
-        // Add user message to history
-        messageHistory.add(Pair("user", prompt))
+        // Convert chat messages to the format expected by buildRequestJson
+        val messageHistory = chat.messages.map { Pair(it.role, it.content) }
         
         // Build the request JSON
         val requestJson = buildRequestJson(prompt, systemMessage, settings.selectedModel, settings.includeMessageHistory, messageHistory)
@@ -126,8 +127,8 @@ class OpenRouterClient {
                     if (chatCompletion != null) {
                         val content = chatCompletion.choices.firstOrNull()?.message?.content ?: ""
                         
-                        // Add assistant response to message history
-                        messageHistory.add(Pair("assistant", content))
+                        // Add assistant response to chat history
+                        chat.messages.add(com.example.llmplugin.settings.ChatMessage(role = "assistant", content = content))
                         
                         callback.onComplete(content)
                     } else {
@@ -144,15 +145,12 @@ class OpenRouterClient {
      * Creates a new chat context
      */
     fun createNewChat(): String {
-        val settings = service<LlmPluginSettings>()
         val newChatId = "chat_${System.currentTimeMillis()}"
+        val chatName = "Chat ${settings.chats.size + 1}"
         
         // Add to settings
-        settings.chatIds.add(newChatId)
+        settings.addChat(newChatId, chatName)
         settings.currentChatId = newChatId
-        
-        // Initialize empty history
-        chatHistories[newChatId] = mutableListOf()
         
         return newChatId
     }
@@ -161,14 +159,8 @@ class OpenRouterClient {
      * Switches to an existing chat context
      */
     fun switchChat(chatId: String) {
-        val settings = service<LlmPluginSettings>()
-        if (settings.chatIds.contains(chatId)) {
+        if (settings.getChatById(chatId) != null) {
             settings.currentChatId = chatId
-            
-            // Initialize history if it doesn't exist
-            if (!chatHistories.containsKey(chatId)) {
-                chatHistories[chatId] = mutableListOf()
-            }
         }
     }
     
@@ -176,23 +168,44 @@ class OpenRouterClient {
      * Clears the history for the current chat
      */
     fun clearCurrentChat() {
-        val settings = service<LlmPluginSettings>()
         val chatId = settings.currentChatId
-        chatHistories[chatId]?.clear()
+        val chat = settings.getChatById(chatId)
+        chat?.messages?.clear()
+    }
+    
+    /**
+     * Deletes a chat
+     */
+    fun deleteChat(chatId: String): Boolean {
+        return settings.deleteChat(chatId)
     }
     
     /**
      * Gets all available chat IDs
      */
     fun getAvailableChatIds(): List<String> {
-        return service<LlmPluginSettings>().chatIds
+        return settings.getChatIds()
+    }
+    
+    /**
+     * Gets all available chats
+     */
+    fun getAvailableChats(): List<com.example.llmplugin.settings.ChatData> {
+        return settings.chats
     }
     
     /**
      * Gets the current chat ID
      */
     fun getCurrentChatId(): String {
-        return service<LlmPluginSettings>().currentChatId
+        return settings.currentChatId
+    }
+    
+    /**
+     * Gets the current chat
+     */
+    fun getCurrentChat(): com.example.llmplugin.settings.ChatData? {
+        return settings.getChatById(settings.currentChatId)
     }
     
     /**

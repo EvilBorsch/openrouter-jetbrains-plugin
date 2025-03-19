@@ -14,6 +14,7 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
 import java.awt.Color
+import java.awt.Component
 import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.FlowLayout
@@ -71,11 +72,28 @@ class LlmChatToolWindow(private val project: Project) {
     }
 
     // Chat context components
-    private val chatContextComboBox = JComboBox<String>().apply {
-        maximumSize = Dimension(250, 30)
-        preferredSize = Dimension(250, 30)
+    private val chatContextComboBox = JComboBox<com.example.llmplugin.settings.ChatData>().apply {
+        maximumSize = Dimension(200, 30)
+        preferredSize = Dimension(200, 30)
         background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
         foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+        
+        // Custom renderer to show chat names instead of toString()
+        renderer = object : DefaultListCellRenderer() {
+            override fun getListCellRendererComponent(
+                list: JList<*>?,
+                value: Any?,
+                index: Int,
+                isSelected: Boolean,
+                cellHasFocus: Boolean
+            ): Component {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+                if (value is com.example.llmplugin.settings.ChatData) {
+                    text = value.name
+                }
+                return this
+            }
+        }
     }
     
     private val newChatButton = JButton("+").apply {
@@ -83,6 +101,15 @@ class LlmChatToolWindow(private val project: Project) {
         preferredSize = Dimension(30, 30)
         background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
         foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+        isFocusPainted = false
+        cursor = Cursor(Cursor.HAND_CURSOR)
+    }
+    
+    private val deleteChatButton = JButton("×").apply {
+        toolTipText = "Delete current chat"
+        preferredSize = Dimension(30, 30)
+        background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
+        foreground = if (isDarkTheme()) JBColor(Color(0xFF6B68), Color(0xFF6B68)) else JBColor(Color(0xE53935), Color(0xE53935))
         isFocusPainted = false
         cursor = Cursor(Cursor.HAND_CURSOR)
     }
@@ -418,14 +445,35 @@ class LlmChatToolWindow(private val project: Project) {
         // Set up chat context combo box listener
         chatContextComboBox.addActionListener {
             if (chatContextComboBox.selectedItem != null) {
-                val selectedChatId = chatContextComboBox.selectedItem as String
-                openRouterClient.switchChat(selectedChatId)
-                clearChatHistory()
-                addMessageToChat(
-                    "Assistant",
-                    "Switched to chat: $selectedChatId. How can I help you?",
-                    "assistant"
+                val selectedChat = chatContextComboBox.selectedItem as com.example.llmplugin.settings.ChatData
+                openRouterClient.switchChat(selectedChat.id)
+                loadChatHistory()
+            }
+        }
+        
+        // Set up delete chat button
+        deleteChatButton.addActionListener {
+            val currentChat = openRouterClient.getCurrentChat() ?: return@addActionListener
+            
+            // Don't allow deleting the default chat
+            if (currentChat.id == "default") {
+                Messages.showWarningDialog(
+                    "The default chat cannot be deleted.",
+                    "Cannot Delete Chat"
                 )
+                return@addActionListener
+            }
+            
+            // Confirm deletion
+            val result = Messages.showYesNoDialog(
+                "Are you sure you want to delete the chat '${currentChat.name}'?",
+                "Delete Chat",
+                Messages.getQuestionIcon()
+            )
+            
+            if (result == Messages.YES) {
+                openRouterClient.deleteChat(currentChat.id)
+                updateChatContextComboBox()
             }
         }
         
@@ -443,18 +491,46 @@ class LlmChatToolWindow(private val project: Project) {
     }
     
     /**
-     * Updates the chat context combo box with available chat IDs
+     * Updates the chat context combo box with available chats
      */
     private fun updateChatContextComboBox() {
         chatContextComboBox.removeAllItems()
         
-        // Add all available chat IDs
-        for (chatId in openRouterClient.getAvailableChatIds()) {
-            chatContextComboBox.addItem(chatId)
+        // Add all available chats
+        for (chat in openRouterClient.getAvailableChats()) {
+            chatContextComboBox.addItem(chat)
         }
         
-        // Select the current chat ID
-        chatContextComboBox.selectedItem = openRouterClient.getCurrentChatId()
+        // Select the current chat
+        val currentChatId = openRouterClient.getCurrentChatId()
+        for (i in 0 until chatContextComboBox.itemCount) {
+            val chat = chatContextComboBox.getItemAt(i)
+            if (chat.id == currentChatId) {
+                chatContextComboBox.selectedIndex = i
+                break
+            }
+        }
+        
+        // Update chat history display
+        loadChatHistory()
+    }
+    
+    /**
+     * Loads the chat history for the current chat
+     */
+    private fun loadChatHistory() {
+        // Clear current display
+        clearChatHistory()
+        
+        // Get current chat
+        val chat = openRouterClient.getCurrentChat() ?: return
+        
+        // Add messages to display
+        for (message in chat.messages) {
+            val sender = if (message.role == "user") "You" else "Assistant"
+            val cssClass = if (message.role == "user") "user" else "assistant"
+            addMessageToChat(sender, message.content, cssClass)
+        }
     }
     
     /**
@@ -509,6 +585,7 @@ class LlmChatToolWindow(private val project: Project) {
                 add(title)
                 add(chatContextComboBox)
                 add(newChatButton)
+                add(deleteChatButton)
             }
             
             add(leftPanel, BorderLayout.WEST)

@@ -4,6 +4,24 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
+import java.io.Serializable
+
+/**
+ * Data class to represent a chat message for persistence
+ */
+data class ChatMessage(
+    var role: String = "",
+    var content: String = ""
+) : Serializable
+
+/**
+ * Data class to represent a chat with its messages for persistence
+ */
+data class ChatData(
+    var id: String = "",
+    var name: String = "",
+    var messages: MutableList<ChatMessage> = mutableListOf()
+) : Serializable
 
 /**
  * Persistent settings for the LLM Plugin.
@@ -21,7 +39,34 @@ class LlmPluginSettings : PersistentStateComponent<LlmPluginSettings> {
     // Chat context settings
     var includeMessageHistory: Boolean = false // Whether to include previous messages in context
     var currentChatId: String = "default" // Current active chat ID
-    var chatIds: MutableList<String> = mutableListOf("default") // List of available chat IDs
+    var chats: MutableList<ChatData> = mutableListOf(ChatData(id = "default", name = "Default Chat"))
+    
+    // Helper function to get all chat IDs
+    fun getChatIds(): List<String> {
+        return chats.map { it.id }
+    }
+    
+    // Helper function to get a chat by ID
+    fun getChatById(id: String): ChatData? {
+        return chats.find { it.id == id }
+    }
+    
+    // Helper function to add a new chat
+    fun addChat(id: String, name: String): ChatData {
+        val newChat = ChatData(id = id, name = name)
+        chats.add(newChat)
+        return newChat
+    }
+    
+    // Helper function to delete a chat
+    fun deleteChat(id: String): Boolean {
+        if (id == "default") return false // Don't allow deleting the default chat
+        val removed = chats.removeIf { it.id == id }
+        if (removed && currentChatId == id) {
+            currentChatId = "default" // Switch to default chat if the current one is deleted
+        }
+        return removed
+    }
     
     var availableModels: MutableList<String> = mutableListOf(
         "google/gemini-2.0-flash-thinking-exp:free",
