@@ -12,9 +12,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.UUID
 
-
-
-
 /**
  * Client for communicating with the OpenRouter API.
  */
@@ -24,9 +21,6 @@ class OpenRouterClient {
         .addLast(KotlinJsonAdapterFactory())
         .build()
     
-    /**
-     * Callback interface for handling responses.
-     */
     /**
      * Callback interface for handling responses.
      */
@@ -78,6 +72,25 @@ class OpenRouterClient {
     data class ChatCompletionMessage(
         val role: String,
         val content: String
+    )
+    
+    /**
+     * Data classes for parsing streaming responses
+     */
+    data class StreamResponse(
+        val id: String,
+        val choices: List<StreamChoice>
+    )
+    
+    data class StreamChoice(
+        val index: Int,
+        val delta: StreamDelta,
+        val finish_reason: String?
+    )
+    
+    data class StreamDelta(
+        val role: String? = null,
+        val content: String? = null
     )
     
     // We'll use the settings service to store chat histories
@@ -233,44 +246,96 @@ class OpenRouterClient {
                 }
 
                 try {
-                    // For non-streaming response, just return the full text
-                    val responseBody = response.body?.string() ?: ""
+                    val responseBody = response.body
+                    if (responseBody == null) {
+                        callback.onError("Empty response body")
+                        return
+                    }
 
-                    // Parse the JSON response
-                    val adapter: JsonAdapter<ChatCompletion> = moshi.adapter(ChatCompletion::class.java)
-                    val chatCompletion = adapter.fromJson(responseBody)
-
-                    if (chatCompletion != null) {
-                        val content = chatCompletion.choices.firstOrNull()?.message?.content ?: ""
-                        val generationId = chatCompletion.id
-                        val cost = chatCompletion.usage?.cost
-
-                        // Add assistant response to chat history with generation ID and cost
-                        val assistantMessage = com.example.llmplugin.settings.ChatMessage(
-                            role = "assistant",
-                            content = content,
-                            generationId = generationId,
-                            cost = cost // Set cost directly from the response
-                        )
-                        chat.messages.add(assistantMessage)
-
-                        // Update UI with cost info if available
-                        if (cost != null) {
-                            callback.onCostUpdate(generationId, cost)
-                        } else {
-                            // If cost isn't in the initial response, try to fetch it
-                            fetchGenerationCost(generationId) { fetchedCost ->
-                                if (fetchedCost != null) {
-                                    assistantMessage.cost = fetchedCost
+                    // Create a stream adapter for parsing streaming responses
+                    val streamAdapter: JsonAdapter<StreamResponse> = moshi.adapter(StreamResponse::class.java)
+                    
+                    // For handling the complete response
+                    val fullResponseBuilder = StringBuilder()
+                    var generationId = ""
+                    
+                    // Process the streaming response
+                    val reader = responseBody.charStream().buffered()
+                    
+                    // Create a message to store in chat history once complete
+                    val assistantMessage = com.example.llmplugin.settings.ChatMessage(
+                        role = "assistant",
+                        content = "",
+                        generationId = ""
+                    )
+                    
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        // Process each line
+                        val currentLine = line ?: continue
+                        
+                        // Skip empty lines
+                        if (currentLine.isBlank()) continue
+                        
+                        // Check for data prefix (SSE format)
+                        if (currentLine.startsWith("data: ")) {
+                            val data = currentLine.substring(6).trim()
+                            
+                            // Check for the end of the stream
+                            if (data == "[DONE]") {
+                                // Stream is complete
+                                break
+                            }
+                            
+                            try {
+                                // Parse the JSON chunk
+                                val streamResponse = streamAdapter.fromJson(data)
+                                
+                                if (streamResponse != null) {
+                                    // Store the generation ID if this is the first chunk
+                                    if (generationId.isEmpty()) {
+                                        generationId = streamResponse.id
+                                        assistantMessage.generationId = generationId
+                                    }
+                                    
+                                    // Process each choice in the response
+                                    for (choice in streamResponse.choices) {
+                                        // Get the content delta
+                                        val content = choice.delta.content
+                                        
+                                        // If there's content, add it to the response and notify the callback
+                                        if (content != null) {
+                                            fullResponseBuilder.append(content)
+                                            callback.onToken(content)
+                                        }
+                                    }
                                 }
-                                callback.onCostUpdate(generationId, fetchedCost)
+                            } catch (e: Exception) {
+                                println("Error parsing stream chunk: ${e.message}")
+                                // Continue processing even if one chunk fails
                             }
                         }
-
-                        callback.onComplete(content, generationId)
-                    } else {
-                        callback.onError("Failed to parse response")
                     }
+                    
+                    // Stream is complete, update the message content
+                    val fullResponse = fullResponseBuilder.toString()
+                    assistantMessage.content = fullResponse
+                    
+                    // Add the message to chat history
+                    chat.messages.add(assistantMessage)
+                    
+                    // Fetch cost information
+                    if (generationId.isNotEmpty()) {
+                        fetchGenerationCost(generationId) { fetchedCost ->
+                            if (fetchedCost != null) {
+                                assistantMessage.cost = fetchedCost
+                            }
+                            callback.onCostUpdate(generationId, fetchedCost)
+                        }
+                    }
+                    
+                    // Notify that the response is complete
+                    callback.onComplete(fullResponse, generationId)
                 } catch (e: Exception) {
                     callback.onError("Error processing response: ${e.message}")
                 }
@@ -387,7 +452,8 @@ class OpenRouterClient {
         systemMessage: String, 
         model: String, 
         includeHistory: Boolean = false,
-        messageHistory: List<Pair<String, String>> = emptyList()
+        messageHistory: List<Pair<String, String>> = emptyList(),
+        stream: Boolean = true
     ): String {
         val messages = mutableListOf<Map<String, String>>()
         
@@ -408,7 +474,7 @@ class OpenRouterClient {
         val requestMap = mapOf(
             "model" to model,
             "messages" to messages,
-            "stream" to false
+            "stream" to stream
         )
         
         val adapter = moshi.adapter(Map::class.java) as JsonAdapter<Map<String, Any>>
