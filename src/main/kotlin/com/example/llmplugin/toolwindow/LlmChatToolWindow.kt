@@ -23,6 +23,9 @@ import javax.swing.text.Element
 import javax.swing.text.html.HTMLDocument
 import javax.swing.text.html.HTMLEditorKit
 import com.intellij.openapi.ui.Messages
+import java.util.UUID
+import javax.swing.event.HyperlinkEvent
+import javax.swing.event.HyperlinkListener
 
 /**
  * Main UI component for the LLM Chat tool window.
@@ -45,11 +48,29 @@ class LlmChatToolWindow(private val project: Project) {
             .assistant-thinking { background-color: #f1f1f1; padding: 10px; border-radius: 8px; margin-bottom: 10px; opacity: 0.7; }
             .prompt-only { background-color: #ffe0b2; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
             pre { white-space: pre-wrap; word-wrap: break-word; margin: 5px 0; font-family: monospace; font-size: 0.9em; }
+            .code-block { position: relative; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin: 8px 0; }
+            .copy-btn { position: absolute; top: 5px; right: 5px; background-color: #4CAF50; color: white; border: none; border-radius: 3px; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+            .copy-btn:hover { background-color: #45a049; }
             strong { font-weight: bold; margin-bottom: 5px; display: block; }
         """)
 
         this.editorKit = editorKit
+
+        // Add hyperlink listener for code copy links
+        addHyperlinkListener(object : HyperlinkListener {
+            override fun hyperlinkUpdate(e: HyperlinkEvent) {
+                if (e.eventType == HyperlinkEvent.EventType.ACTIVATED) {
+                    if (e.description.startsWith("copy:")) {
+                        val codeId = e.description.substring(5)
+                        copyCodeSnippet(codeId)
+                    }
+                }
+            }
+        })
     }
+
+    // Map to store code snippets by ID
+    private val codeSnippets = mutableMapOf<String, String>()
 
     private val promptField = JBTextField().apply {
         emptyText.text = "Type your prompt here (use @file.txt to include file contents)"
@@ -234,10 +255,17 @@ class LlmChatToolWindow(private val project: Project) {
         val doc = chatHistoryPane.document as HTMLDocument
         val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
+        // Process message to add copy buttons to code blocks
+        val processedMessage = if (cssClass == "assistant") {
+            processCodeBlocks(message)
+        } else {
+            escapeHtml(message)
+        }
+
         val html = """
             <div class="$cssClass">
                 <strong>$sender:</strong>
-                <pre>${escapeHtml(message)}</pre>
+                <pre>${processedMessage}</pre>
             </div>
         """.trimIndent()
 
@@ -252,6 +280,46 @@ class LlmChatToolWindow(private val project: Project) {
 
         // Scroll to bottom
         chatHistoryPane.caretPosition = doc.length
+    }
+
+    // Process the message to add copy buttons to code blocks
+    private fun processCodeBlocks(message: String): String {
+        // Pattern to match markdown code blocks (both with language specifier and without)
+        val codeBlockPattern = Regex("```([a-zA-Z0-9]*)?\\s*\\n([\\s\\S]*?)\\n```")
+
+        return escapeHtml(message).replace(codeBlockPattern) { matchResult ->
+            val language = matchResult.groupValues[1].trim()
+            val code = matchResult.groupValues[2]
+
+            // Generate a unique ID for this code snippet
+            val codeId = "code-" + UUID.randomUUID().toString()
+
+            // Store the code in our map for later copying
+            codeSnippets[codeId] = code
+
+            // Create HTML with a copy button
+            """
+            <div class="code-block">
+                <a href="copy:$codeId" class="copy-btn">Copy</a>
+                ${if (language.isNotEmpty()) "<span><strong>$language</strong></span>" else ""}
+                <pre>$code</pre>
+            </div>
+            """.trimIndent()
+        }
+    }
+
+    // Copy the code snippet with the given ID to the clipboard
+    private fun copyCodeSnippet(codeId: String) {
+        codeSnippets[codeId]?.let { code ->
+            val selection = StringSelection(code)
+            CopyPasteManager.getInstance().setContents(selection)
+
+            // Show a notification
+            Messages.showInfoMessage(
+                "Code snippet copied to clipboard.",
+                "Code Copied"
+            )
+        }
     }
 
     private fun updateLastAssistantMessage(token: String) {
@@ -274,7 +342,7 @@ class LlmChatToolWindow(private val project: Project) {
                 val html = """
                     <div class="assistant">
                         <strong>Assistant:</strong>
-                        <pre>${escapeHtml(newContent)}</pre>
+                        <pre>${processCodeBlocks(newContent)}</pre>
                     </div>
                 """.trimIndent()
 
@@ -306,6 +374,5 @@ class LlmChatToolWindow(private val project: Project) {
         return text.replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
-            .replace("\n", "<br/>")
     }
 }
