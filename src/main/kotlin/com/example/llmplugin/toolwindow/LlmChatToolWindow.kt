@@ -34,6 +34,9 @@ import javax.swing.text.html.HTMLDocument
 import javax.swing.text.html.HTMLEditorKit
 import java.util.UUID
 
+import javax.swing.text.html.HTML
+import javax.swing.text.StyleConstants
+
 /**
  * Main UI component for the LLM Chat tool window with dark theme support.
  */
@@ -43,6 +46,8 @@ class LlmChatToolWindow(private val project: Project) {
 
     // Get settings
     private val settings = service<LlmPluginSettings>()
+
+    private var totalCost: Double = 0.0
 
     // Model selector combo box
     private val modelSelectorComboBox = JComboBox<String>().apply {
@@ -77,7 +82,7 @@ class LlmChatToolWindow(private val project: Project) {
         preferredSize = Dimension(200, 30)
         background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
         foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
-        
+
         // Custom renderer to show chat names instead of toString()
         renderer = object : DefaultListCellRenderer() {
             override fun getListCellRendererComponent(
@@ -95,7 +100,7 @@ class LlmChatToolWindow(private val project: Project) {
             }
         }
     }
-    
+
     private val newChatButton = JButton("+").apply {
         toolTipText = "Create new chat"
         preferredSize = Dimension(30, 30)
@@ -104,16 +109,19 @@ class LlmChatToolWindow(private val project: Project) {
         isFocusPainted = false
         cursor = Cursor(Cursor.HAND_CURSOR)
     }
-    
+
     private val deleteChatButton = JButton("×").apply {
         toolTipText = "Delete current chat"
         preferredSize = Dimension(30, 30)
         background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
-        foreground = if (isDarkTheme()) JBColor(Color(0xFF6B68), Color(0xFF6B68)) else JBColor(Color(0xE53935), Color(0xE53935))
+        foreground = if (isDarkTheme()) JBColor(
+            Color(0xFF6B68),
+            Color(0xFF6B68)
+        ) else JBColor(Color(0xE53935), Color(0xE53935))
         isFocusPainted = false
         cursor = Cursor(Cursor.HAND_CURSOR)
     }
-    
+
     // Components
     private val chatHistoryPane = JTextPane().apply {
         contentType = "text/html"
@@ -178,7 +186,31 @@ class LlmChatToolWindow(private val project: Project) {
                 font-weight: bold;
                 font-size: 12px;
                 border-bottom: 1px solid ${if (isDarkTheme()) "#444444" else "#e0e0e0"};
+                display: flex;
+                justify-content: space-between;
             }
+            
+            .cost-badge {
+    background-color: ${if (isDarkTheme()) "#555555" else "#e0e0e0"};
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin-left: 8px;
+    font-size: 11px;
+    font-weight: bold;
+    color: ${if (isDarkTheme()) "#ffffff" else "#333333"};
+    display: inline-block;
+}
+
+.total-cost {
+    text-align: right; 
+    font-size: 12px; 
+    padding: 8px 15px; 
+    background-color: ${if (isDarkTheme()) "#333333" else "#f0f0f0"}; 
+    color: ${if (isDarkTheme()) "#ffffff" else "#333333"}; 
+    border-top: 1px solid ${if (isDarkTheme()) "#444444" else "#e0e0e0"}; 
+    font-weight: bold;
+    margin-top: 10px;
+}
             
             .user .message-header {
                 background-color: ${if (isDarkTheme()) "#1e3e6b" else "#bbdefb"};
@@ -241,6 +273,7 @@ class LlmChatToolWindow(private val project: Project) {
                 cursor: pointer;
             }
             
+           
             .copy-btn:hover {
                 background-color: ${if (isDarkTheme()) "#505050" else "#bdbdbd"};
                 color: ${if (isDarkTheme()) "#ffffff" else "#000000"};
@@ -384,10 +417,11 @@ class LlmChatToolWindow(private val project: Project) {
         foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
         isOpaque = false
     }
-    
+
     // Checkbox for "Include message history" mode
     private val includeMessageHistoryCheckBox = JBCheckBox("Include message history").apply {
-        toolTipText = "When checked, previous messages will be included in the context sent to the LLM"
+        toolTipText =
+            "When checked, previous messages will be included in the context sent to the LLM"
         foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
         isOpaque = false
         isSelected = settings.includeMessageHistory
@@ -433,28 +467,29 @@ class LlmChatToolWindow(private val project: Project) {
         copyPromptOnlyCheckBox.addActionListener {
             noticePanel.isVisible = copyPromptOnlyCheckBox.isSelected
         }
-        
+
         // Set listener for include message history checkbox
         includeMessageHistoryCheckBox.addActionListener {
             settings.includeMessageHistory = includeMessageHistoryCheckBox.isSelected
         }
-        
+
         // Initialize chat context combo box
         updateChatContextComboBox()
-        
+
         // Set up chat context combo box listener
         chatContextComboBox.addActionListener {
             if (chatContextComboBox.selectedItem != null) {
-                val selectedChat = chatContextComboBox.selectedItem as com.example.llmplugin.settings.ChatData
+                val selectedChat =
+                    chatContextComboBox.selectedItem as com.example.llmplugin.settings.ChatData
                 openRouterClient.switchChat(selectedChat.id)
                 loadChatHistory()
             }
         }
-        
+
         // Set up delete chat button
         deleteChatButton.addActionListener {
             val currentChat = openRouterClient.getCurrentChat() ?: return@addActionListener
-            
+
             // Don't allow deleting the default chat
             if (currentChat.id == "default") {
                 Messages.showWarningDialog(
@@ -463,26 +498,26 @@ class LlmChatToolWindow(private val project: Project) {
                 )
                 return@addActionListener
             }
-            
+
             // Confirm deletion
             val result = Messages.showYesNoDialog(
                 "Are you sure you want to delete the chat '${currentChat.name}'?",
                 "Delete Chat",
                 Messages.getQuestionIcon()
             )
-            
+
             if (result == Messages.YES) {
                 openRouterClient.deleteChat(currentChat.id)
                 updateChatContextComboBox()
             }
         }
-        
+
         // Set up new chat button
         newChatButton.addActionListener {
             // Create new chat and refresh UI state
             val newChatId = openRouterClient.createNewChat()
             updateChatContextComboBox()
-            
+
             // Force selection of new chat in the combo box
             chatContextComboBox.selectedItem = openRouterClient.getCurrentChat()
             // Clear display and add fresh welcome message
@@ -495,18 +530,18 @@ class LlmChatToolWindow(private val project: Project) {
             )
         }
     }
-    
+
     /**
      * Updates the chat context combo box with available chats
      */
     private fun updateChatContextComboBox() {
         chatContextComboBox.removeAllItems()
-        
+
         // Add all available chats
         for (chat in openRouterClient.getAvailableChats()) {
             chatContextComboBox.addItem(chat)
         }
-        
+
         // Select the current chat
         val currentChatId = openRouterClient.getCurrentChatId()
         for (i in 0 until chatContextComboBox.itemCount) {
@@ -516,29 +551,50 @@ class LlmChatToolWindow(private val project: Project) {
                 break
             }
         }
-        
+
         // Update chat history display
         loadChatHistory()
     }
-    
+
     /**
      * Loads the chat history for the current chat
      */
     private fun loadChatHistory() {
         // Clear current display
         clearChatHistory()
-        
+        totalCost = 0.0  // Reset total cost
+
         // Get current chat
         val chat = openRouterClient.getCurrentChat() ?: return
-        
+
         // Add messages to display
         for (message in chat.messages) {
             val sender = if (message.role == "user") "You" else "Assistant"
             val cssClass = if (message.role == "user") "user" else "assistant"
-            addMessageToChat(sender, message.content, cssClass)
+
+            // Add message with cost if available
+            addMessageToChat(
+                sender,
+                message.content,
+                cssClass,
+                message.generationId ?: "",
+                message.cost
+            )
+
+            // Add to total cost if available
+            if (message.cost != null) {
+                totalCost += message.cost!!
+                println("DEBUG: Added message cost to total: ${message.cost}, new total: $totalCost")
+            }
+        }
+
+        // Update total cost display if there are costs
+        if (totalCost > 0) {
+            println("DEBUG: Updating total cost display in loadChatHistory: $totalCost")
+            updateTotalCostDisplay()
         }
     }
-    
+
     /**
      * Clears the chat history display
      */
@@ -548,6 +604,7 @@ class LlmChatToolWindow(private val project: Project) {
         lastAssistantMessageElement = null
         assistantMessageContent = StringBuilder()
         codeSnippets.clear()
+        totalCost = 0.0  // Reset total cost
     }
 
     /**
@@ -578,22 +635,23 @@ class LlmChatToolWindow(private val project: Project) {
 
             // Left side with title and chat context controls
             val leftPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
-                background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
-                    Color(0xF5F5F5), Color(0xF5F5F5)
-                )
-                
+                background =
+                    if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                        Color(0xF5F5F5), Color(0xF5F5F5)
+                    )
+
                 val title = JLabel("LLM Chat")
                 title.font = JBUI.Fonts.create(Font.SANS_SERIF, 14).asBold()
                 title.foreground =
                     if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
                 title.border = EmptyBorder(0, 5, 0, 0)
-                
+
                 add(title)
                 add(chatContextComboBox)
                 add(newChatButton)
                 add(deleteChatButton)
             }
-            
+
             add(leftPanel, BorderLayout.WEST)
         }
 
@@ -613,11 +671,15 @@ class LlmChatToolWindow(private val project: Project) {
 
             // Model row
             val modelRowPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
-                background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
-                    Color(0xF5F5F5), Color(0xF5F5F5)
-                )
+                background =
+                    if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                        Color(0xF5F5F5), Color(0xF5F5F5)
+                    )
                 add(JLabel("Model:").apply {
-                    foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
+                    foreground = if (isDarkTheme()) JBColor(
+                        Color(0xA0A0A0),
+                        Color(0xA0A0A0)
+                    ) else JBColor.GRAY
                 })
                 add(modelSelectorComboBox)
             }
@@ -665,6 +727,103 @@ class LlmChatToolWindow(private val project: Project) {
         )
 
         return panel
+    }
+
+    /**
+     * Copy the code snippet with the given ID to the clipboard
+     */
+    private fun copyCodeSnippet(codeId: String) {
+        codeSnippets[codeId]?.let { code ->
+            val selection = StringSelection(code)
+            CopyPasteManager.getInstance().setContents(selection)
+
+            // Show a notification
+            SwingUtilities.invokeLater {
+                Messages.showInfoMessage(
+                    "Code snippet copied to clipboard.",
+                    "Code Copied"
+                )
+            }
+        }
+    }
+
+    /**
+     * Update the last assistant message with new content
+     */
+    private fun updateLastAssistantMessage(token: String) {
+        assistantMessageContent.append(token)
+        replaceLastAssistantMessage(assistantMessageContent.toString())
+    }
+
+    /**
+     * Replace the last assistant message with new content
+     */
+    private fun replaceLastAssistantMessage(newContent: String, generationId: String = "", cost: Double? = null) {
+        val doc = chatHistoryPane.document as HTMLDocument
+
+        if (lastAssistantMessageElement != null) {
+            // Replace the content of the last assistant message
+            val startOffset = lastAssistantMessageElement!!.startOffset
+            val endOffset = lastAssistantMessageElement!!.endOffset
+
+            try {
+                doc.remove(startOffset, endOffset - startOffset)
+                val kit = chatHistoryPane.editorKit as HTMLEditorKit
+
+                // Create cost badge HTML if cost is available
+                val costBadgeHtml = if (cost != null) {
+                    "<span class=\"cost-badge\">$${String.format("%.5f", cost)}</span>"
+                } else {
+                    ""
+                }
+
+                val html = """
+            <div class="message assistant" ${if (generationId.isNotEmpty()) "id=\"msg-$generationId\"" else ""}>
+                <div class="message-header">
+                    <span>Assistant</span>
+                    $costBadgeHtml
+                </div>
+                <div class="message-content">${processMessage(newContent)}</div>
+            </div>
+        """.trimIndent()
+
+                kit.insertHTML(doc, startOffset, html, 0, 0, null)
+
+                // Update total cost if available
+                if (cost != null) {
+                    totalCost += cost
+                    updateTotalCostDisplay()
+                }
+
+                // Update the reference to the new element
+                val root = doc.defaultRootElement
+                val index = root.getElementIndex(startOffset)
+                if (index >= 0) {
+                    lastAssistantMessageElement = root.getElement(index)
+                } else {
+                    lastAssistantMessageElement = null
+                }
+
+                // Scroll to bottom
+                chatHistoryPane.caretPosition = doc.length
+            } catch (e: Exception) {
+                // Fallback: add as new message
+                lastAssistantMessageElement = null
+                addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
+            }
+        } else {
+            // Fallback: add as new message
+            addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
+        }
+    }
+
+    /**
+     * Escape HTML special characters to prevent XSS and rendering issues
+     */
+    private fun escapeHtml(text: String): String {
+        return text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
     }
 
     /**
@@ -729,10 +888,10 @@ class LlmChatToolWindow(private val project: Project) {
                         }
                     }
 
-                    override fun onComplete(fullResponse: String) {
+                    override fun onComplete(fullResponse: String, generationId: String) {
                         // Final update to the assistant's message
                         SwingUtilities.invokeLater {
-                            replaceLastAssistantMessage(fullResponse)
+                            replaceLastAssistantMessage(fullResponse, generationId)
                         }
                     }
 
@@ -742,7 +901,52 @@ class LlmChatToolWindow(private val project: Project) {
                             replaceLastAssistantMessage("Error: $error")
                         }
                     }
+
+                    override fun onCostUpdate(generationId: String, cost: Double?) {
+                        println("DEBUG: onCostUpdate called with ID: $generationId, cost: $cost")
+                        if (cost != null && generationId.isNotEmpty()) {
+                            SwingUtilities.invokeLater {
+                                updateMessageCost(generationId, cost)
+                            }
+                        }
+                    }
                 })
+        }
+    }
+
+
+
+    private fun updateMessageCost(generationId: String, cost: Double) {
+        println("DEBUG: Updating message cost for ID: $generationId, cost: $cost")
+
+        // Add to total cost
+        totalCost += cost
+
+        // Update the UI
+        SwingUtilities.invokeLater {
+            try {
+                // Find the chat containing this message ID
+                val chat = openRouterClient.getCurrentChat()
+                if (chat != null) {
+                    // Update the cost in the message object
+                    for (message in chat.messages) {
+                        if (message.generationId == generationId) {
+                            message.cost = cost
+                            println("DEBUG: Updated cost in message object: $generationId")
+                            break
+                        }
+                    }
+                }
+
+                // Reload the entire chat to show updated costs
+                // This is a simpler approach than trying to update individual elements
+                loadChatHistory()
+
+                println("DEBUG: Chat history reloaded with costs")
+            } catch (e: Exception) {
+                println("DEBUG: Error updating cost: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 
@@ -867,7 +1071,13 @@ class LlmChatToolWindow(private val project: Project) {
     /**
      * Add a message to the chat history
      */
-    private fun addMessageToChat(sender: String, message: String, cssClass: String) {
+    private fun addMessageToChat(
+        sender: String,
+        message: String,
+        cssClass: String,
+        generationId: String = "",
+        cost: Double? = null
+    ) {
         val doc = chatHistoryPane.document as HTMLDocument
         val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
@@ -879,14 +1089,30 @@ class LlmChatToolWindow(private val project: Project) {
             escapeHtml(message).replace("\n", "<br>")
         }
 
+        // Create cost badge HTML if cost is available
+        val costBadgeHtml = if (cost != null) {
+            "<span class=\"cost-badge\">$${String.format("%.5f", cost)}</span>"
+        } else {
+            ""
+        }
+
         val html = """
-        <div class="message $cssClass">
-            <div class="message-header">$sender</div>
+        <div class="message $cssClass" ${if (generationId.isNotEmpty()) "id=\"msg-$generationId\"" else ""}>
+            <div class="message-header">
+                <span>$sender</span>
+                $costBadgeHtml
+            </div>
             <div class="message-content">$processedMessage</div>
         </div>
     """.trimIndent()
 
         kit.insertHTML(doc, doc.length, html, 0, 0, null)
+
+        // If there's a cost, update total cost and refresh the total cost display
+        if (cost != null) {
+            totalCost += cost
+            updateTotalCostDisplay()
+        }
 
         // Store reference to the last assistant message
         if (cssClass == "assistant-thinking") {
@@ -899,85 +1125,51 @@ class LlmChatToolWindow(private val project: Project) {
         chatHistoryPane.caretPosition = doc.length
     }
 
-
     /**
-     * Copy the code snippet with the given ID to the clipboard
+     * Update the total cost display at the bottom of chat history
      */
-    private fun copyCodeSnippet(codeId: String) {
-        codeSnippets[codeId]?.let { code ->
-            val selection = StringSelection(code)
-            CopyPasteManager.getInstance().setContents(selection)
+    private fun updateTotalCostDisplay() {
+        println("DEBUG: Updating total cost display: $totalCost")
 
-            // Show a notification
-            SwingUtilities.invokeLater {
-                Messages.showInfoMessage(
-                    "Code snippet copied to clipboard.",
-                    "Code Copied"
-                )
-            }
-        }
-    }
-
-    /**
-     * Update the last assistant message with new content
-     */
-    private fun updateLastAssistantMessage(token: String) {
-        assistantMessageContent.append(token)
-        replaceLastAssistantMessage(assistantMessageContent.toString())
-    }
-
-    /**
-     * Replace the last assistant message with new content
-     */
-    private fun replaceLastAssistantMessage(newContent: String) {
         val doc = chatHistoryPane.document as HTMLDocument
+        val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-        if (lastAssistantMessageElement != null) {
-            // Replace the content of the last assistant message
-            val startOffset = lastAssistantMessageElement!!.startOffset
-            val endOffset = lastAssistantMessageElement!!.endOffset
-
-            try {
-                doc.remove(startOffset, endOffset - startOffset)
-                val kit = chatHistoryPane.editorKit as HTMLEditorKit
-
-                val html = """
-    <div class="message assistant">
-        <div class="message-header">Assistant</div>
-        <div class="message-content">${processMessage(newContent)}</div>
-    </div>
-""".trimIndent()
-
-                kit.insertHTML(doc, startOffset, html, 0, 0, null)
-
-                // Update the reference to the new element
-                val root = doc.defaultRootElement
-                val index = root.getElementIndex(startOffset)
-                if (index >= 0) {
-                    lastAssistantMessageElement = root.getElement(index)
-                } else {
-                    lastAssistantMessageElement = null
+        try {
+            // Find and remove any existing total cost display
+            val root = doc.defaultRootElement
+            for (i in 0 until root.elementCount) {
+                val element = root.getElement(i)
+                val attr = element.attributes
+                if (attr.getAttribute(StyleConstants.NameAttribute) == HTML.Tag.DIV) {
+                    val className = attr.getAttribute(HTML.Attribute.CLASS)
+                    if (className == "total-cost") {
+                        doc.remove(element.startOffset, element.endOffset - element.startOffset)
+                        break
+                    }
                 }
-
-                // Scroll to bottom
-                chatHistoryPane.caretPosition = doc.length
-            } catch (e: Exception) {
-                // Fallback: add as new message
-                lastAssistantMessageElement = null
-                addMessageToChat("Assistant", newContent, "assistant")
             }
-        } else {
-            // Fallback: add as new message
-            addMessageToChat("Assistant", newContent, "assistant")
+        } catch (e: Exception) {
+            println("DEBUG: Error removing old total cost: ${e.message}")
         }
-    }
 
-    /**
-     * Escape HTML special characters to prevent XSS and rendering issues
-     */
-    private fun escapeHtml(text: String): String {
-        return text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
+        try {
+            // Add a new, very visible total cost display
+            val totalCostHtml = """
+        <div class="total-cost">
+            <span style="color: ${if (isDarkTheme()) "#00FF00" else "#006400"}; font-weight: bold;">
+                TOTAL COST: $${String.format("%.5f", totalCost)}
+            </span>
+        </div>
+        """.trimIndent()
+
+            kit.insertHTML(doc, doc.length, totalCostHtml, 0, 0, null)
+            println("DEBUG: Added new total cost HTML")
+
+            // Scroll to bottom to make sure it's visible
+            chatHistoryPane.caretPosition = doc.length
+        } catch (e: Exception) {
+            println("DEBUG: Error adding new total cost: ${e.message}")
+            e.printStackTrace()
+        }
     }
 }

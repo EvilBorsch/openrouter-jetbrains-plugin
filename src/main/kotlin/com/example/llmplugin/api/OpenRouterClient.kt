@@ -1,6 +1,5 @@
 package com.example.llmplugin.api
 
-import com.example.llmplugin.settings.ChatData
 import com.example.llmplugin.settings.LlmPluginSettings
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -12,6 +11,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.UUID
+
+
+
 
 /**
  * Client for communicating with the OpenRouter API.
@@ -25,11 +27,15 @@ class OpenRouterClient {
     /**
      * Callback interface for handling responses.
      */
+    /**
+     * Callback interface for handling responses.
+     */
     interface ResponseCallback {
         fun onStart()
         fun onToken(token: String)
-        fun onComplete(fullResponse: String)
+        fun onComplete(fullResponse: String, generationId: String = "")
         fun onError(error: String)
+        fun onCostUpdate(generationId: String, cost: Double?)
     }
     
     /**
@@ -37,7 +43,25 @@ class OpenRouterClient {
      */
     data class ChatCompletion(
         val id: String,
-        val choices: List<ChatCompletionChoice>
+        val choices: List<ChatCompletionChoice>,
+        val usage: UsageInfo? = null
+    )
+
+    data class UsageInfo(
+        val prompt_tokens: Int? = null,
+        val completion_tokens: Int? = null,
+        val total_tokens: Int? = null,
+        val cost: Double? = null
+    )
+
+    data class GenerationCostResponse(
+        val data: GenerationCost
+    )
+
+    data class GenerationCost(
+        val id: String,
+        val total_cost: Double
+        // You can add other fields if needed
     )
     
     /**
@@ -58,6 +82,96 @@ class OpenRouterClient {
     
     // We'll use the settings service to store chat histories
     private val settings = service<LlmPluginSettings>()
+
+    fun fetchGenerationCost(generationId: String, maxRetries: Int = 5, callback: (Double?) -> Unit) {
+        if (settings.openRouterApiKey.isBlank()) {
+            println("DEBUG: API key is blank, skipping cost fetch")
+            callback(null)
+            return
+        }
+
+        println("DEBUG: Fetching cost for generation ID: $generationId")
+
+        // Track retry count
+        var retryCount = 0
+        val baseDelayMs = 500 // Start with 500ms delay
+
+        fun makeRequest() {
+            // Create the request
+            val request = Request.Builder()
+                .url("${settings.openRouterBaseUrl}/generation?id=$generationId")
+                .header("Authorization", "Bearer ${settings.openRouterApiKey}")
+                .build()
+
+            // Execute the request asynchronously
+            client.newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    println("DEBUG: Cost fetch failed: ${e.message}")
+                    retryIfNeeded()
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    println("DEBUG: Cost fetch response code: ${response.code}")
+
+                    if (!response.isSuccessful) {
+                        println("DEBUG: Cost fetch failed with code: ${response.code}")
+                        retryIfNeeded()
+                        return
+                    }
+
+                    try {
+                        // Parse the JSON response
+                        val responseBody = response.body?.string() ?: ""
+                        println("DEBUG: Cost fetch response: $responseBody")
+
+                        // Parse using the nested structure
+                        val responseAdapter: JsonAdapter<GenerationCostResponse> = moshi.adapter(GenerationCostResponse::class.java)
+                        val costResponse = responseAdapter.fromJson(responseBody)
+
+                        if (costResponse?.data?.total_cost != null) {
+                            println("DEBUG: Parsed cost info: ${costResponse.data.total_cost}")
+                            callback(costResponse.data.total_cost)
+                        } else {
+                            println("DEBUG: Cost info not available yet, retrying...")
+                            retryIfNeeded()
+                        }
+                    } catch (e: Exception) {
+                        println("DEBUG: Error parsing cost response: ${e.message}, ${e.stackTraceToString()}")
+                        retryIfNeeded()
+                    }
+                }
+
+                fun retryIfNeeded() {
+                    if (retryCount < maxRetries) {
+                        retryCount++
+                        // Exponential backoff with jitter
+                        val delayMs = (baseDelayMs * Math.pow(1.5, retryCount.toDouble())).toLong() +
+                                (Math.random() * 100).toLong()
+                        println("DEBUG: Retry $retryCount/$maxRetries after ${delayMs}ms")
+
+                        // Use a handler to post delayed execution
+                        object : Thread() {
+                            override fun run() {
+                                try {
+                                    sleep(delayMs)
+                                    makeRequest()
+                                } catch (e: InterruptedException) {
+                                    println("DEBUG: Retry sleep interrupted")
+                                    callback(null)
+                                }
+                            }
+                        }.start()
+                    } else {
+                        println("DEBUG: Max retries ($maxRetries) reached, giving up")
+                        callback(null)
+                    }
+                }
+            })
+        }
+
+        // Start the first request
+        makeRequest()
+    }
     
     /**
      * Sends a prompt to the OpenRouter API and handles the response.
@@ -111,28 +225,49 @@ class OpenRouterClient {
             override fun onFailure(call: Call, e: IOException) {
                 callback.onError("Connection error: ${e.message}")
             }
-            
+
             override fun onResponse(call: Call, response: Response) {
                 if (!response.isSuccessful) {
                     callback.onError("API error: ${response.code} ${response.message}")
                     return
                 }
-                
+
                 try {
                     // For non-streaming response, just return the full text
                     val responseBody = response.body?.string() ?: ""
-                    
+
                     // Parse the JSON response
                     val adapter: JsonAdapter<ChatCompletion> = moshi.adapter(ChatCompletion::class.java)
                     val chatCompletion = adapter.fromJson(responseBody)
-                    
+
                     if (chatCompletion != null) {
                         val content = chatCompletion.choices.firstOrNull()?.message?.content ?: ""
-                        
-                        // Add assistant response to chat history
-                        chat.messages.add(com.example.llmplugin.settings.ChatMessage(role = "assistant", content = content))
-                        
-                        callback.onComplete(content)
+                        val generationId = chatCompletion.id
+                        val cost = chatCompletion.usage?.cost
+
+                        // Add assistant response to chat history with generation ID and cost
+                        val assistantMessage = com.example.llmplugin.settings.ChatMessage(
+                            role = "assistant",
+                            content = content,
+                            generationId = generationId,
+                            cost = cost // Set cost directly from the response
+                        )
+                        chat.messages.add(assistantMessage)
+
+                        // Update UI with cost info if available
+                        if (cost != null) {
+                            callback.onCostUpdate(generationId, cost)
+                        } else {
+                            // If cost isn't in the initial response, try to fetch it
+                            fetchGenerationCost(generationId) { fetchedCost ->
+                                if (fetchedCost != null) {
+                                    assistantMessage.cost = fetchedCost
+                                }
+                                callback.onCostUpdate(generationId, fetchedCost)
+                            }
+                        }
+
+                        callback.onComplete(content, generationId)
                     } else {
                         callback.onError("Failed to parse response")
                     }

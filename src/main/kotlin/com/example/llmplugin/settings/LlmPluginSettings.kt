@@ -11,7 +11,9 @@ import java.io.Serializable
  */
 data class ChatMessage(
     var role: String = "",
-    var content: String = ""
+    var content: String = "",
+    var cost: Double? = null,
+    var generationId: String? = null
 ) : Serializable
 
 /**
