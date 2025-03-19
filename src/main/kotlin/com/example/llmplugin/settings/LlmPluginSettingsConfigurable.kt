@@ -27,7 +27,8 @@ class LlmPluginSettingsConfigurable : Configurable {
 
         return panel.getOpenRouterBaseUrl() != settings.openRouterBaseUrl ||
                 panel.getOpenRouterApiKey() != settings.openRouterApiKey ||
-                panel.getSelectedModel() != settings.selectedModel
+                panel.getSelectedModel() != settings.selectedModel ||
+                panel.isIncludeMessageHistory() != settings.includeMessageHistory
     }
 
     override fun apply() {
@@ -37,6 +38,7 @@ class LlmPluginSettingsConfigurable : Configurable {
         settings.openRouterBaseUrl = panel.getOpenRouterBaseUrl()
         settings.openRouterApiKey = panel.getOpenRouterApiKey()
         settings.selectedModel = panel.getSelectedModel()
+        settings.includeMessageHistory = panel.isIncludeMessageHistory()
     }
 
     override fun reset() {
@@ -46,6 +48,7 @@ class LlmPluginSettingsConfigurable : Configurable {
         panel.setOpenRouterBaseUrl(settings.openRouterBaseUrl)
         panel.setOpenRouterApiKey(settings.openRouterApiKey)
         panel.setSelectedModel(settings.selectedModel)
+        panel.setIncludeMessageHistory(settings.includeMessageHistory)
     }
 
     override fun disposeUIResources() {

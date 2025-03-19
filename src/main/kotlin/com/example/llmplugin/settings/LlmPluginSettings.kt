@@ -17,6 +17,12 @@ class LlmPluginSettings : PersistentStateComponent<LlmPluginSettings> {
     var openRouterBaseUrl: String = "https://openrouter.ai/api/v1"
     var openRouterApiKey: String = ""
     var selectedModel: String = "google/gemini-2.0-flash-thinking-exp:free"
+    
+    // Chat context settings
+    var includeMessageHistory: Boolean = false // Whether to include previous messages in context
+    var currentChatId: String = "default" // Current active chat ID
+    var chatIds: MutableList<String> = mutableListOf("default") // List of available chat IDs
+    
     var availableModels: MutableList<String> = mutableListOf(
         "google/gemini-2.0-flash-thinking-exp:free",
         "anthropic/claude-3.7-sonnet",

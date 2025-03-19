@@ -54,6 +54,9 @@ class OpenRouterClient {
         val content: String
     )
     
+    // Store message history for each chat context
+    private val chatHistories = mutableMapOf<String, MutableList<Pair<String, String>>>()
+    
     /**
      * Sends a prompt to the OpenRouter API and handles the response.
      */
@@ -73,8 +76,22 @@ class OpenRouterClient {
         // Build the system message with file contents
         val systemMessage = buildSystemMessage(fileContents)
         
+        // Get current chat ID
+        val chatId = settings.currentChatId
+        
+        // Initialize chat history for this chat ID if it doesn't exist
+        if (!chatHistories.containsKey(chatId)) {
+            chatHistories[chatId] = mutableListOf()
+        }
+        
+        // Get the message history for the current chat
+        val messageHistory = chatHistories[chatId]!!
+        
+        // Add user message to history
+        messageHistory.add(Pair("user", prompt))
+        
         // Build the request JSON
-        val requestJson = buildRequestJson(prompt, systemMessage, settings.selectedModel)
+        val requestJson = buildRequestJson(prompt, systemMessage, settings.selectedModel, settings.includeMessageHistory, messageHistory)
         
         // Create the request
         val request = Request.Builder()
@@ -108,6 +125,10 @@ class OpenRouterClient {
                     
                     if (chatCompletion != null) {
                         val content = chatCompletion.choices.firstOrNull()?.message?.content ?: ""
+                        
+                        // Add assistant response to message history
+                        messageHistory.add(Pair("assistant", content))
+                        
                         callback.onComplete(content)
                     } else {
                         callback.onError("Failed to parse response")
@@ -117,6 +138,61 @@ class OpenRouterClient {
                 }
             }
         })
+    }
+    
+    /**
+     * Creates a new chat context
+     */
+    fun createNewChat(): String {
+        val settings = service<LlmPluginSettings>()
+        val newChatId = "chat_${System.currentTimeMillis()}"
+        
+        // Add to settings
+        settings.chatIds.add(newChatId)
+        settings.currentChatId = newChatId
+        
+        // Initialize empty history
+        chatHistories[newChatId] = mutableListOf()
+        
+        return newChatId
+    }
+    
+    /**
+     * Switches to an existing chat context
+     */
+    fun switchChat(chatId: String) {
+        val settings = service<LlmPluginSettings>()
+        if (settings.chatIds.contains(chatId)) {
+            settings.currentChatId = chatId
+            
+            // Initialize history if it doesn't exist
+            if (!chatHistories.containsKey(chatId)) {
+                chatHistories[chatId] = mutableListOf()
+            }
+        }
+    }
+    
+    /**
+     * Clears the history for the current chat
+     */
+    fun clearCurrentChat() {
+        val settings = service<LlmPluginSettings>()
+        val chatId = settings.currentChatId
+        chatHistories[chatId]?.clear()
+    }
+    
+    /**
+     * Gets all available chat IDs
+     */
+    fun getAvailableChatIds(): List<String> {
+        return service<LlmPluginSettings>().chatIds
+    }
+    
+    /**
+     * Gets the current chat ID
+     */
+    fun getCurrentChatId(): String {
+        return service<LlmPluginSettings>().currentChatId
     }
     
     /**
@@ -144,13 +220,32 @@ class OpenRouterClient {
     /**
      * Builds the request JSON for the OpenRouter API.
      */
-    private fun buildRequestJson(prompt: String, systemMessage: String, model: String): String {
+    private fun buildRequestJson(
+        prompt: String, 
+        systemMessage: String, 
+        model: String, 
+        includeHistory: Boolean = false,
+        messageHistory: List<Pair<String, String>> = emptyList()
+    ): String {
+        val messages = mutableListOf<Map<String, String>>()
+        
+        // Always include system message first
+        messages.add(mapOf("role" to "system", "content" to systemMessage))
+        
+        if (includeHistory) {
+            // Include previous messages from history (excluding the current prompt which we'll add last)
+            val previousMessages = messageHistory.dropLast(1)
+            for ((role, content) in previousMessages) {
+                messages.add(mapOf("role" to role, "content" to content))
+            }
+        }
+        
+        // Add current user prompt
+        messages.add(mapOf("role" to "user", "content" to prompt))
+        
         val requestMap = mapOf(
             "model" to model,
-            "messages" to listOf(
-                mapOf("role" to "system", "content" to systemMessage),
-                mapOf("role" to "user", "content" to prompt)
-            ),
+            "messages" to messages,
             "stream" to false
         )
         

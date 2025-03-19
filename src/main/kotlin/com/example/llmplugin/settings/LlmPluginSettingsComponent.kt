@@ -2,6 +2,7 @@ package com.example.llmplugin.settings
 
 import com.intellij.openapi.components.service
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
@@ -19,6 +20,7 @@ class LlmPluginSettingsComponent {
     private val openRouterBaseUrlField = JBTextField()
     private val openRouterApiKeyField = JBPasswordField()
     private val modelComboBox = JComboBox<String>()
+    private val includeMessageHistoryCheckBox = JBCheckBox("Include message history in context")
     private val addModelButton = JButton("Add Model")
     private val removeModelButton = JButton("Remove Model")
     private val modelListModel = DefaultListModel<String>()
@@ -95,6 +97,7 @@ class LlmPluginSettingsComponent {
         .addLabeledComponent(JBLabel("OpenRouter Base URL:"), openRouterBaseUrlField, 1, false)
         .addLabeledComponent(JBLabel("OpenRouter API Key:"), openRouterApiKeyField, 1, false)
         .addLabeledComponent(JBLabel("Model:"), modelComboBox, 1, false)
+        .addComponent(includeMessageHistoryCheckBox, 1)
         .addSeparator()
         .addLabeledComponent(JBLabel("Custom Models:"), JScrollPane(modelList).apply {
             preferredSize = Dimension(300, 100)
@@ -127,6 +130,12 @@ class LlmPluginSettingsComponent {
 
     fun setSelectedModel(model: String) {
         modelComboBox.selectedItem = model
+    }
+    
+    fun isIncludeMessageHistory(): Boolean = includeMessageHistoryCheckBox.isSelected
+    
+    fun setIncludeMessageHistory(include: Boolean) {
+        includeMessageHistoryCheckBox.isSelected = include
     }
 
     /**

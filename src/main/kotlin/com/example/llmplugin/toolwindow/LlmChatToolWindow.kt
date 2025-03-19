@@ -70,6 +70,23 @@ class LlmChatToolWindow(private val project: Project) {
         foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
     }
 
+    // Chat context components
+    private val chatContextComboBox = JComboBox<String>().apply {
+        maximumSize = Dimension(250, 30)
+        preferredSize = Dimension(250, 30)
+        background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
+        foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+    }
+    
+    private val newChatButton = JButton("+").apply {
+        toolTipText = "Create new chat"
+        preferredSize = Dimension(30, 30)
+        background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
+        foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+        isFocusPainted = false
+        cursor = Cursor(Cursor.HAND_CURSOR)
+    }
+    
     // Components
     private val chatHistoryPane = JTextPane().apply {
         contentType = "text/html"
@@ -340,6 +357,14 @@ class LlmChatToolWindow(private val project: Project) {
         foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
         isOpaque = false
     }
+    
+    // Checkbox for "Include message history" mode
+    private val includeMessageHistoryCheckBox = JBCheckBox("Include message history").apply {
+        toolTipText = "When checked, previous messages will be included in the context sent to the LLM"
+        foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
+        isOpaque = false
+        isSelected = settings.includeMessageHistory
+    }
 
     // Panel for the notice when copy mode is enabled
     private val noticePanel = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
@@ -381,6 +406,66 @@ class LlmChatToolWindow(private val project: Project) {
         copyPromptOnlyCheckBox.addActionListener {
             noticePanel.isVisible = copyPromptOnlyCheckBox.isSelected
         }
+        
+        // Set listener for include message history checkbox
+        includeMessageHistoryCheckBox.addActionListener {
+            settings.includeMessageHistory = includeMessageHistoryCheckBox.isSelected
+        }
+        
+        // Initialize chat context combo box
+        updateChatContextComboBox()
+        
+        // Set up chat context combo box listener
+        chatContextComboBox.addActionListener {
+            if (chatContextComboBox.selectedItem != null) {
+                val selectedChatId = chatContextComboBox.selectedItem as String
+                openRouterClient.switchChat(selectedChatId)
+                clearChatHistory()
+                addMessageToChat(
+                    "Assistant",
+                    "Switched to chat: $selectedChatId. How can I help you?",
+                    "assistant"
+                )
+            }
+        }
+        
+        // Set up new chat button
+        newChatButton.addActionListener {
+            val newChatId = openRouterClient.createNewChat()
+            updateChatContextComboBox()
+            clearChatHistory()
+            addMessageToChat(
+                "Assistant",
+                "Created new chat. How can I help you?",
+                "assistant"
+            )
+        }
+    }
+    
+    /**
+     * Updates the chat context combo box with available chat IDs
+     */
+    private fun updateChatContextComboBox() {
+        chatContextComboBox.removeAllItems()
+        
+        // Add all available chat IDs
+        for (chatId in openRouterClient.getAvailableChatIds()) {
+            chatContextComboBox.addItem(chatId)
+        }
+        
+        // Select the current chat ID
+        chatContextComboBox.selectedItem = openRouterClient.getCurrentChatId()
+    }
+    
+    /**
+     * Clears the chat history display
+     */
+    private fun clearChatHistory() {
+        val doc = chatHistoryPane.document as HTMLDocument
+        doc.remove(0, doc.length)
+        lastAssistantMessageElement = null
+        assistantMessageContent = StringBuilder()
+        codeSnippets.clear()
     }
 
     /**
@@ -409,13 +494,24 @@ class LlmChatToolWindow(private val project: Project) {
             )
             preferredSize = Dimension(0, 40)
 
-            val title = JLabel("LLM Chat")
-            title.font = JBUI.Fonts.create(Font.SANS_SERIF, 14).asBold()
-            title.foreground =
-                if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
-            title.border = EmptyBorder(0, 15, 0, 0)
-
-            add(title, BorderLayout.WEST)
+            // Left side with title and chat context controls
+            val leftPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
+                background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                    Color(0xF5F5F5), Color(0xF5F5F5)
+                )
+                
+                val title = JLabel("LLM Chat")
+                title.font = JBUI.Fonts.create(Font.SANS_SERIF, 14).asBold()
+                title.foreground =
+                    if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+                title.border = EmptyBorder(0, 5, 0, 0)
+                
+                add(title)
+                add(chatContextComboBox)
+                add(newChatButton)
+            }
+            
+            add(leftPanel, BorderLayout.WEST)
 
             // Add model selector to the right side of the header
             val modelPanel = JPanel(FlowLayout(FlowLayout.RIGHT)).apply {
@@ -444,14 +540,15 @@ class LlmChatToolWindow(private val project: Project) {
             )
             border = EmptyBorder(10, 15, 15, 15)
 
-            // Options panel for checkbox
-            val optionsPanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            // Options panel for checkboxes
+            val optionsPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
                 background =
                     if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
                         Color(0xF5F5F5), Color(0xF5F5F5)
                     )
                 border = EmptyBorder(0, 0, 10, 0)
                 add(copyPromptOnlyCheckBox)
+                add(includeMessageHistoryCheckBox)
             }
 
             // Input field and send button
