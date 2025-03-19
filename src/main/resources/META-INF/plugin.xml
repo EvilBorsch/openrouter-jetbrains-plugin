@@ -1,0 +1,47 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>com.example.llmplugin</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>LLM Plugin</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor email="support@example.com" url="https://www.example.com">Example</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description><![CDATA[
+    A plugin that allows you to reference project files in prompts sent to OpenRouter LLM API.<br>
+    <em>Features:</em>
+    <ul>
+      <li>Chat UI with input field and send button</li>
+      <li>File reference syntax like @my_file.txt to include file contents</li>
+      <li>Support for folder references with recursive parsing</li>
+      <li>Integration with OpenRouter API</li>
+      <li>Streaming responses from the LLM</li>
+    </ul>
+  ]]></description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Tool Window for the chat UI -->
+        <toolWindow id="LLM Chat" secondary="true" icon="AllIcons.General.Modified" anchor="right"
+                    factoryClass="com.example.llmplugin.toolwindow.LlmChatToolWindowFactory"/>
+        
+        <!-- Application settings -->
+        <applicationConfigurable
+                parentId="tools"
+                instance="com.example.llmplugin.settings.LlmPluginSettingsConfigurable"
+                id="com.example.llmplugin.settings.LlmPluginSettingsConfigurable"
+                displayName="LLM Plugin Settings"/>
+        
+        <applicationService
+                serviceImplementation="com.example.llmplugin.settings.LlmPluginSettings"/>
+    </extensions>
+</idea-plugin>
