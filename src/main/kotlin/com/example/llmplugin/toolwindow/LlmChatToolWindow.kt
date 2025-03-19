@@ -47,7 +47,6 @@ class LlmChatToolWindow(private val project: Project) {
     // Get settings
     private val settings = service<LlmPluginSettings>()
 
-    private var totalCost: Double = 0.0
 
     // Model selector combo box
     private val modelSelectorComboBox = JComboBox<String>().apply {
@@ -201,16 +200,6 @@ class LlmChatToolWindow(private val project: Project) {
     display: inline-block;
 }
 
-.total-cost {
-    text-align: right; 
-    font-size: 12px; 
-    padding: 8px 15px; 
-    background-color: ${if (isDarkTheme()) "#333333" else "#f0f0f0"}; 
-    color: ${if (isDarkTheme()) "#ffffff" else "#333333"}; 
-    border-top: 1px solid ${if (isDarkTheme()) "#444444" else "#e0e0e0"}; 
-    font-weight: bold;
-    margin-top: 10px;
-}
             
             .user .message-header {
                 background-color: ${if (isDarkTheme()) "#1e3e6b" else "#bbdefb"};
@@ -562,7 +551,6 @@ class LlmChatToolWindow(private val project: Project) {
     private fun loadChatHistory() {
         // Clear current display
         clearChatHistory()
-        totalCost = 0.0  // Reset total cost
 
         // Get current chat
         val chat = openRouterClient.getCurrentChat() ?: return
@@ -581,18 +569,8 @@ class LlmChatToolWindow(private val project: Project) {
                 message.cost
             )
 
-            // Add to total cost if available
-            if (message.cost != null) {
-                totalCost += message.cost!!
-                println("DEBUG: Added message cost to total: ${message.cost}, new total: $totalCost")
-            }
         }
 
-        // Update total cost display if there are costs
-        if (totalCost > 0) {
-            println("DEBUG: Updating total cost display in loadChatHistory: $totalCost")
-            updateTotalCostDisplay()
-        }
     }
 
     /**
@@ -604,7 +582,6 @@ class LlmChatToolWindow(private val project: Project) {
         lastAssistantMessageElement = null
         assistantMessageContent = StringBuilder()
         codeSnippets.clear()
-        totalCost = 0.0  // Reset total cost
     }
 
     /**
@@ -789,11 +766,6 @@ class LlmChatToolWindow(private val project: Project) {
 
                 kit.insertHTML(doc, startOffset, html, 0, 0, null)
 
-                // Update total cost if available
-                if (cost != null) {
-                    totalCost += cost
-                    updateTotalCostDisplay()
-                }
 
                 // Update the reference to the new element
                 val root = doc.defaultRootElement
@@ -919,8 +891,6 @@ class LlmChatToolWindow(private val project: Project) {
     private fun updateMessageCost(generationId: String, cost: Double) {
         println("DEBUG: Updating message cost for ID: $generationId, cost: $cost")
 
-        // Add to total cost
-        totalCost += cost
 
         // Update the UI
         SwingUtilities.invokeLater {
@@ -1108,11 +1078,7 @@ class LlmChatToolWindow(private val project: Project) {
 
         kit.insertHTML(doc, doc.length, html, 0, 0, null)
 
-        // If there's a cost, update total cost and refresh the total cost display
-        if (cost != null) {
-            totalCost += cost
-            updateTotalCostDisplay()
-        }
+
 
         // Store reference to the last assistant message
         if (cssClass == "assistant-thinking") {
@@ -1125,51 +1091,4 @@ class LlmChatToolWindow(private val project: Project) {
         chatHistoryPane.caretPosition = doc.length
     }
 
-    /**
-     * Update the total cost display at the bottom of chat history
-     */
-    private fun updateTotalCostDisplay() {
-        println("DEBUG: Updating total cost display: $totalCost")
-
-        val doc = chatHistoryPane.document as HTMLDocument
-        val kit = chatHistoryPane.editorKit as HTMLEditorKit
-
-        try {
-            // Find and remove any existing total cost display
-            val root = doc.defaultRootElement
-            for (i in 0 until root.elementCount) {
-                val element = root.getElement(i)
-                val attr = element.attributes
-                if (attr.getAttribute(StyleConstants.NameAttribute) == HTML.Tag.DIV) {
-                    val className = attr.getAttribute(HTML.Attribute.CLASS)
-                    if (className == "total-cost") {
-                        doc.remove(element.startOffset, element.endOffset - element.startOffset)
-                        break
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            println("DEBUG: Error removing old total cost: ${e.message}")
-        }
-
-        try {
-            // Add a new, very visible total cost display
-            val totalCostHtml = """
-        <div class="total-cost">
-            <span style="color: ${if (isDarkTheme()) "#00FF00" else "#006400"}; font-weight: bold;">
-                TOTAL COST: $${String.format("%.5f", totalCost)}
-            </span>
-        </div>
-        """.trimIndent()
-
-            kit.insertHTML(doc, doc.length, totalCostHtml, 0, 0, null)
-            println("DEBUG: Added new total cost HTML")
-
-            // Scroll to bottom to make sure it's visible
-            chatHistoryPane.caretPosition = doc.length
-        } catch (e: Exception) {
-            println("DEBUG: Error adding new total cost: ${e.message}")
-            e.printStackTrace()
-        }
-    }
 }
