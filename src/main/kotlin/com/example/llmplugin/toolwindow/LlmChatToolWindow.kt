@@ -589,18 +589,6 @@ class LlmChatToolWindow(private val project: Project) {
             }
             
             add(leftPanel, BorderLayout.WEST)
-
-            // Add model selector to the right side of the header
-            val modelPanel = JPanel(FlowLayout(FlowLayout.RIGHT)).apply {
-                background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
-                    Color(0xF5F5F5), Color(0xF5F5F5)
-                )
-                add(JLabel("Model:").apply {
-                    foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
-                })
-                add(modelSelectorComboBox)
-            }
-            add(modelPanel, BorderLayout.EAST)
         }
 
         panel.add(headerPanel, BorderLayout.NORTH)
@@ -617,8 +605,19 @@ class LlmChatToolWindow(private val project: Project) {
             )
             border = EmptyBorder(10, 15, 15, 15)
 
-            // Options panel for checkboxes
-            val optionsPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
+            // Model row
+            val modelRowPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
+                background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                    Color(0xF5F5F5), Color(0xF5F5F5)
+                )
+                add(JLabel("Model:").apply {
+                    foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
+                })
+                add(modelSelectorComboBox)
+            }
+
+            // Checkbox row
+            val checkboxRowPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
                 background =
                     if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
                         Color(0xF5F5F5), Color(0xF5F5F5)
@@ -626,6 +625,13 @@ class LlmChatToolWindow(private val project: Project) {
                 border = EmptyBorder(0, 0, 10, 0)
                 add(copyPromptOnlyCheckBox)
                 add(includeMessageHistoryCheckBox)
+            }
+
+            // Vertical panel for rows
+            val rowsPanel = JPanel().apply {
+                layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                add(modelRowPanel)
+                add(checkboxRowPanel)
             }
 
             // Input field and send button
@@ -638,7 +644,7 @@ class LlmChatToolWindow(private val project: Project) {
                 add(sendButton, BorderLayout.EAST)
             }
 
-            add(optionsPanel, BorderLayout.NORTH)
+            add(rowsPanel, BorderLayout.NORTH)
             add(promptPanel, BorderLayout.CENTER)
             add(noticePanel, BorderLayout.SOUTH)
         }
