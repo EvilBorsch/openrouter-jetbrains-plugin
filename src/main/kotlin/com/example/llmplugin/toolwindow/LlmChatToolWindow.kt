@@ -2,12 +2,17 @@ package com.example.llmplugin.toolwindow
 
 import com.example.llmplugin.api.OpenRouterClient
 import com.example.llmplugin.parser.FileReferenceParser
+import com.intellij.openapi.components.service
+import com.example.llmplugin.settings.LlmPluginSettings
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.datatransfer.StringSelection
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import javax.swing.JButton
@@ -17,6 +22,7 @@ import javax.swing.SwingUtilities
 import javax.swing.text.Element
 import javax.swing.text.html.HTMLDocument
 import javax.swing.text.html.HTMLEditorKit
+import com.intellij.openapi.ui.Messages
 
 /**
  * Main UI component for the LLM Chat tool window.
@@ -37,6 +43,7 @@ class LlmChatToolWindow(private val project: Project) {
             .user { background-color: #e1f5fe; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
             .assistant { background-color: #f1f1f1; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
             .assistant-thinking { background-color: #f1f1f1; padding: 10px; border-radius: 8px; margin-bottom: 10px; opacity: 0.7; }
+            .prompt-only { background-color: #ffe0b2; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
             pre { white-space: pre-wrap; word-wrap: break-word; margin: 5px 0; font-family: monospace; font-size: 0.9em; }
             strong { font-weight: bold; margin-bottom: 5px; display: block; }
         """)
@@ -52,12 +59,20 @@ class LlmChatToolWindow(private val project: Project) {
         addActionListener { sendPrompt() }
     }
 
+    // Add checkbox for "Copy prompt only" mode
+    private val copyPromptOnlyCheckBox = JBCheckBox("Copy prompt only").apply {
+        toolTipText = "When checked, prompts will be copied to clipboard instead of being sent to OpenRouter"
+    }
+
     private val fileReferenceParser = FileReferenceParser(project)
     private val openRouterClient = OpenRouterClient()
 
     // Keep track of the last assistant message element
     private var lastAssistantMessageElement: Element? = null
     private var assistantMessageContent = StringBuilder()
+
+    // Store original file references from the prompt
+    private val fileReferenceRegex = Regex("@([\\w.-/]+)")
 
     init {
         // Add key listener to promptField for Enter key
@@ -81,9 +96,16 @@ class LlmChatToolWindow(private val project: Project) {
         }
         panel.add(scrollPane, BorderLayout.CENTER)
 
-        // Input area
+        // Input area with checkbox
         val inputPanel = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(0, 10, 10, 10)
+
+            // Add checkbox to the left side
+            val optionsPanel = JPanel().apply {
+                add(copyPromptOnlyCheckBox)
+            }
+
+            add(optionsPanel, BorderLayout.NORTH)
             add(promptField, BorderLayout.CENTER)
             add(sendButton, BorderLayout.EAST)
         }
@@ -99,6 +121,9 @@ class LlmChatToolWindow(private val project: Project) {
         // Add user message to chat
         addMessageToChat("You", promptText, "user")
 
+        // Extract file references to preserve the original references
+        val fileReferences = extractFileReferences(promptText)
+
         // Clear input field
         promptField.text = ""
 
@@ -108,36 +133,101 @@ class LlmChatToolWindow(private val project: Project) {
         // Parse file references
         val (processedPrompt, fileContents) = fileReferenceParser.parseFileReferences(promptText)
 
-        // Send to OpenRouter API
-        openRouterClient.sendPrompt(project, processedPrompt, fileContents, object : OpenRouterClient.ResponseCallback {
-            override fun onStart() {
-                // Add placeholder for assistant response
-                SwingUtilities.invokeLater {
-                    addMessageToChat("Assistant", "Thinking...", "assistant-thinking")
+        if (copyPromptOnlyCheckBox.isSelected) {
+            // Create a human-readable prompt for copying
+            val readablePrompt = createReadablePrompt(processedPrompt, fileContents, fileReferences)
+
+            // Copy to clipboard
+            val selection = StringSelection(readablePrompt)
+            CopyPasteManager.getInstance().setContents(selection)
+
+            // Display the prompt in chat
+            addMessageToChat("Prompt (Copied to Clipboard)", readablePrompt, "prompt-only")
+
+            // Notify user
+            Messages.showInfoMessage(
+                "The prompt has been copied to clipboard and was not sent to OpenRouter.",
+                "Prompt Copied"
+            )
+        } else {
+            // Send to OpenRouter API normally
+            openRouterClient.sendPrompt(project, processedPrompt, fileContents, object : OpenRouterClient.ResponseCallback {
+                override fun onStart() {
+                    // Add placeholder for assistant response
+                    SwingUtilities.invokeLater {
+                        addMessageToChat("Assistant", "Thinking...", "assistant-thinking")
+                    }
+                }
+
+                override fun onToken(token: String) {
+                    // Update the assistant's message with the new token
+                    SwingUtilities.invokeLater {
+                        updateLastAssistantMessage(token)
+                    }
+                }
+
+                override fun onComplete(fullResponse: String) {
+                    // Final update to the assistant's message
+                    SwingUtilities.invokeLater {
+                        replaceLastAssistantMessage(fullResponse)
+                    }
+                }
+
+                override fun onError(error: String) {
+                    // Show error message
+                    SwingUtilities.invokeLater {
+                        replaceLastAssistantMessage("Error: $error")
+                    }
+                }
+            })
+        }
+    }
+
+    // Extract file references from the prompt to preserve the original format
+    private fun extractFileReferences(prompt: String): List<String> {
+        val references = mutableListOf<String>()
+        val matches = fileReferenceRegex.findAll(prompt)
+
+        for (match in matches) {
+            references.add(match.groupValues[1])
+        }
+
+        return references
+    }
+
+    // Create a human-readable prompt for copying
+    private fun createReadablePrompt(prompt: String, fileContents: Map<String, String>, fileReferences: List<String>): String {
+        val sb = StringBuilder()
+
+        // Format system message
+        if (fileContents.isNotEmpty()) {
+            sb.appendLine("I'm sharing the following files with you:")
+            sb.appendLine()
+
+            // Use the original file references with './' prefix
+            for (reference in fileReferences) {
+                if (fileContents.containsKey(reference)) {
+                    // Format as relative path with './' prefix
+                    sb.appendLine("FILE: ./${reference}")
+                    sb.appendLine("```")
+                    sb.appendLine(fileContents[reference])
+                    sb.appendLine("```")
+                    sb.appendLine()
                 }
             }
 
-            override fun onToken(token: String) {
-                // Update the assistant's message with the new token
-                SwingUtilities.invokeLater {
-                    updateLastAssistantMessage(token)
-                }
-            }
+            sb.appendLine("Please refer to these files when answering my question.")
+            sb.appendLine()
+        }
 
-            override fun onComplete(fullResponse: String) {
-                // Final update to the assistant's message
-                SwingUtilities.invokeLater {
-                    replaceLastAssistantMessage(fullResponse)
-                }
-            }
+        // Add the user's prompt, replacing @file references with ./file for clarity
+        val processedPrompt = fileReferenceRegex.replace(prompt) {
+            "./${it.groupValues[1]}"
+        }
 
-            override fun onError(error: String) {
-                // Show error message
-                SwingUtilities.invokeLater {
-                    replaceLastAssistantMessage("Error: $error")
-                }
-            }
-        })
+        sb.append(processedPrompt)
+
+        return sb.toString()
     }
 
     private fun addMessageToChat(sender: String, message: String, cssClass: String) {
