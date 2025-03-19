@@ -50,7 +50,8 @@ class LlmChatToolWindow(private val project: Project) {
 
         // Apply CSS styling with dark theme support
         val styleSheet = editorKit.styleSheet
-        styleSheet.addRule("""
+        styleSheet.addRule(
+            """
             body {
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                 margin: 0;
@@ -168,7 +169,36 @@ class LlmChatToolWindow(private val project: Project) {
                 background-color: ${if (isDarkTheme()) "#505050" else "#bdbdbd"};
                 color: ${if (isDarkTheme()) "#ffffff" else "#000000"};
             }
-        """)
+            
+            
+                .inline-code {
+        font-family: 'JetBrains Mono', Consolas, monospace;
+        background-color: ${if (isDarkTheme()) "#2d2d2d" else "#f0f0f0"};
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 90%;
+    }
+    
+    em {
+        font-style: italic;
+    }
+    
+    strong {
+        font-weight: bold;
+    }
+    
+    ul, ol {
+        margin-left: 20px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+    }
+    
+    li {
+        margin-bottom: 3px;
+    }
+
+        """
+        )
 
         this.editorKit = editorKit
 
@@ -190,14 +220,18 @@ class LlmChatToolWindow(private val project: Project) {
         border = EmptyBorder(0, 0, 0, 0)
         verticalScrollBar.unitIncrement = 16
         background = if (isDarkTheme()) JBColor(Color(0x252526), Color(0x252526)) else JBColor.WHITE
-        chatHistoryPane.background = if (isDarkTheme()) JBColor(Color(0x252526), Color(0x252526)) else JBColor.WHITE
+        chatHistoryPane.background =
+            if (isDarkTheme()) JBColor(Color(0x252526), Color(0x252526)) else JBColor.WHITE
     }
 
     // Modern-looking text area for input
     private val promptTextArea = JTextArea().apply {
         border = BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(
-                if (isDarkTheme()) JBColor(Color(0x3E3E3E), Color(0x3E3E3E)) else JBColor.LIGHT_GRAY, 1
+                if (isDarkTheme()) JBColor(
+                    Color(0x3E3E3E),
+                    Color(0x3E3E3E)
+                ) else JBColor.LIGHT_GRAY, 1
             ),
             BorderFactory.createEmptyBorder(8, 10, 8, 10)
         )
@@ -239,7 +273,10 @@ class LlmChatToolWindow(private val project: Project) {
     // Modern-looking send button with icon support
     private val sendButton = JButton("Send").apply {
         preferredSize = Dimension(100, 36)
-        background = if (isDarkTheme()) JBColor(Color(0x0E639C), Color(0x0E639C)) else JBColor(Color(0x4285F4), Color(0x4285F4))
+        background = if (isDarkTheme()) JBColor(
+            Color(0x0E639C),
+            Color(0x0E639C)
+        ) else JBColor(Color(0x4285F4), Color(0x4285F4))
         foreground = JBColor.WHITE
         border = BorderFactory.createEmptyBorder(0, 10, 0, 10)
         isFocusPainted = false
@@ -249,18 +286,25 @@ class LlmChatToolWindow(private val project: Project) {
 
         addMouseListener(object : MouseAdapter() {
             override fun mouseEntered(e: MouseEvent?) {
-                background = if (isDarkTheme()) JBColor(Color(0x1177BB), Color(0x1177BB)) else JBColor(Color(0x3367D6), Color(0x3367D6))
+                background =
+                    if (isDarkTheme()) JBColor(Color(0x1177BB), Color(0x1177BB)) else JBColor(
+                        Color(0x3367D6), Color(0x3367D6)
+                    )
             }
 
             override fun mouseExited(e: MouseEvent?) {
-                background = if (isDarkTheme()) JBColor(Color(0x0E639C), Color(0x0E639C)) else JBColor(Color(0x4285F4), Color(0x4285F4))
+                background =
+                    if (isDarkTheme()) JBColor(Color(0x0E639C), Color(0x0E639C)) else JBColor(
+                        Color(0x4285F4), Color(0x4285F4)
+                    )
             }
         })
     }
 
     // Checkbox for "Copy prompt only" mode with modern styling
     private val copyPromptOnlyCheckBox = JBCheckBox("Copy prompt only").apply {
-        toolTipText = "When checked, prompts will be copied to clipboard instead of being sent to OpenRouter"
+        toolTipText =
+            "When checked, prompts will be copied to clipboard instead of being sent to OpenRouter"
         foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
         isOpaque = false
     }
@@ -268,16 +312,24 @@ class LlmChatToolWindow(private val project: Project) {
     // Panel for the notice when copy mode is enabled
     private val noticePanel = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
         border = BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(1, 0, 0, 0,
+            BorderFactory.createMatteBorder(
+                1, 0, 0, 0,
                 if (isDarkTheme()) JBColor(Color(0x3E3E3E), Color(0x3E3E3E)) else JBColor.LIGHT_GRAY
             ),
             BorderFactory.createEmptyBorder(8, 10, 8, 10)
         )
-        background = if (isDarkTheme()) JBColor(Color(0x332700), Color(0x332700)) else JBColor(Color(0xFFF8E1), Color(0xFFF8E1))
+        background = if (isDarkTheme()) JBColor(
+            Color(0x332700),
+            Color(0x332700)
+        ) else JBColor(Color(0xFFF8E1), Color(0xFFF8E1))
         isVisible = false
 
-        val label = JLabel("Copy mode enabled - messages will be copied to clipboard instead of being sent to API")
-        label.foreground = if (isDarkTheme()) JBColor(Color(0xFFCA28), Color(0xFFCA28)) else JBColor(Color(0xF57F17), Color(0xF57F17))
+        val label =
+            JLabel("Copy mode enabled - messages will be copied to clipboard instead of being sent to API")
+        label.foreground = if (isDarkTheme()) JBColor(
+            Color(0xFFCA28),
+            Color(0xFFCA28)
+        ) else JBColor(Color(0xF57F17), Color(0xF57F17))
         label.font = JBUI.Fonts.create(Font.SANS_SERIF, 11)
         add(label)
     }
@@ -311,19 +363,24 @@ class LlmChatToolWindow(private val project: Project) {
      */
     fun getContent(): JPanel {
         val panel = JPanel(BorderLayout())
-        panel.background = if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
+        panel.background =
+            if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
 
         // Add header panel with title
         val headerPanel = JPanel(BorderLayout()).apply {
-            background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(Color(0xF5F5F5), Color(0xF5F5F5))
-            border = MatteBorder(0, 0, 1, 0,
+            background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                Color(0xF5F5F5), Color(0xF5F5F5)
+            )
+            border = MatteBorder(
+                0, 0, 1, 0,
                 if (isDarkTheme()) JBColor(Color(0x3E3E3E), Color(0x3E3E3E)) else JBColor.LIGHT_GRAY
             )
             preferredSize = Dimension(0, 40)
 
             val title = JLabel("LLM Chat")
             title.font = JBUI.Fonts.create(Font.SANS_SERIF, 14).asBold()
-            title.foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+            title.foreground =
+                if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
             title.border = EmptyBorder(0, 15, 0, 0)
 
             add(title, BorderLayout.WEST)
@@ -336,19 +393,27 @@ class LlmChatToolWindow(private val project: Project) {
 
         // Input area panel
         val inputPanel = JPanel(BorderLayout()).apply {
-            background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(Color(0xF5F5F5), Color(0xF5F5F5))
+            background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                Color(0xF5F5F5), Color(0xF5F5F5)
+            )
             border = EmptyBorder(10, 15, 15, 15)
 
             // Options panel for checkbox
             val optionsPanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
-                background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(Color(0xF5F5F5), Color(0xF5F5F5))
+                background =
+                    if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                        Color(0xF5F5F5), Color(0xF5F5F5)
+                    )
                 border = EmptyBorder(0, 0, 10, 0)
                 add(copyPromptOnlyCheckBox)
             }
 
             // Input field and send button
             val promptPanel = JPanel(BorderLayout(10, 0)).apply {
-                background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(Color(0xF5F5F5), Color(0xF5F5F5))
+                background =
+                    if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                        Color(0xF5F5F5), Color(0xF5F5F5)
+                    )
                 add(promptTextArea, BorderLayout.CENTER)
                 add(sendButton, BorderLayout.EAST)
             }
@@ -361,9 +426,11 @@ class LlmChatToolWindow(private val project: Project) {
         panel.add(inputPanel, BorderLayout.SOUTH)
 
         // Add a welcome message
-        addMessageToChat("Assistant",
+        addMessageToChat(
+            "Assistant",
             "Hello! I'm your AI assistant. How can I help you today? You can reference files with @filename.ext syntax.",
-            "assistant")
+            "assistant"
+        )
 
         return panel
     }
@@ -411,35 +478,39 @@ class LlmChatToolWindow(private val project: Project) {
             }
         } else {
             // Send to OpenRouter API
-            openRouterClient.sendPrompt(project, processedPrompt, fileContents, object : OpenRouterClient.ResponseCallback {
-                override fun onStart() {
-                    // Add placeholder for assistant response
-                    SwingUtilities.invokeLater {
-                        addMessageToChat("Assistant", "Thinking...", "assistant-thinking")
+            openRouterClient.sendPrompt(
+                project,
+                processedPrompt,
+                fileContents,
+                object : OpenRouterClient.ResponseCallback {
+                    override fun onStart() {
+                        // Add placeholder for assistant response
+                        SwingUtilities.invokeLater {
+                            addMessageToChat("Assistant", "Thinking...", "assistant-thinking")
+                        }
                     }
-                }
 
-                override fun onToken(token: String) {
-                    // Update the assistant's message with the new token
-                    SwingUtilities.invokeLater {
-                        updateLastAssistantMessage(token)
+                    override fun onToken(token: String) {
+                        // Update the assistant's message with the new token
+                        SwingUtilities.invokeLater {
+                            updateLastAssistantMessage(token)
+                        }
                     }
-                }
 
-                override fun onComplete(fullResponse: String) {
-                    // Final update to the assistant's message
-                    SwingUtilities.invokeLater {
-                        replaceLastAssistantMessage(fullResponse)
+                    override fun onComplete(fullResponse: String) {
+                        // Final update to the assistant's message
+                        SwingUtilities.invokeLater {
+                            replaceLastAssistantMessage(fullResponse)
+                        }
                     }
-                }
 
-                override fun onError(error: String) {
-                    // Show error message
-                    SwingUtilities.invokeLater {
-                        replaceLastAssistantMessage("Error: $error")
+                    override fun onError(error: String) {
+                        // Show error message
+                        SwingUtilities.invokeLater {
+                            replaceLastAssistantMessage("Error: $error")
+                        }
                     }
-                }
-            })
+                })
         }
     }
 
@@ -460,7 +531,11 @@ class LlmChatToolWindow(private val project: Project) {
     /**
      * Create a human-readable prompt for copying
      */
-    private fun createReadablePrompt(prompt: String, fileContents: Map<String, String>, fileReferences: List<String>): String {
+    private fun createReadablePrompt(
+        prompt: String,
+        fileContents: Map<String, String>,
+        fileReferences: List<String>
+    ): String {
         val sb = StringBuilder()
 
         // Format system message
@@ -495,25 +570,89 @@ class LlmChatToolWindow(private val project: Project) {
     }
 
     /**
+     * Process the message to properly format markdown elements including code blocks
+     */
+    private fun processMessage(message: String): String {
+        // First, escape HTML
+        var processed = escapeHtml(message)
+
+        // Replace newlines with <br> tags to preserve line breaks
+        processed = processed.replace("\n", "<br>")
+
+        // Process code blocks
+        val codeBlockPattern = Regex("```([a-zA-Z0-9]*)?\\s*<br>([\\s\\S]*?)<br>```")
+        processed = processed.replace(codeBlockPattern) { matchResult ->
+            val language = matchResult.groupValues[1].trim()
+            // Replace <br> tags back to newlines within code blocks
+            val code = matchResult.groupValues[2].replace("<br>", "\n")
+
+            // Generate a unique ID for this code snippet
+            val codeId = "code-" + UUID.randomUUID().toString()
+
+            // Store the code in our map for later copying
+            codeSnippets[codeId] = code
+
+            // Create HTML with a copy button
+            """
+        <div class="code-block">
+            ${if (language.isNotEmpty()) "<div class=\"code-language\">$language</div>" else ""}
+            <a href="copy:$codeId" class="copy-btn">Copy</a>
+            <pre>${code.replace("\n", "<br>")}</pre>
+        </div>
+        """.trimIndent()
+        }
+
+        // Process inline code
+        val inlineCodePattern = Regex("`([^`]+)`")
+        processed = processed.replace(inlineCodePattern) { matchResult ->
+            val code = matchResult.groupValues[1]
+            "<span class=\"inline-code\">$code</span>"
+        }
+
+        // Process bold text
+        processed = processed.replace(Regex("\\*\\*([^*]+)\\*\\*")) { matchResult ->
+            "<strong>${matchResult.groupValues[1]}</strong>"
+        }
+
+        // Process italic text
+        processed = processed.replace(Regex("\\*([^*]+)\\*")) { matchResult ->
+            "<em>${matchResult.groupValues[1]}</em>"
+        }
+
+        // Process unordered lists
+        processed = processed.replace(Regex("<br>- ([^<]+)")) { matchResult ->
+            "<br>• ${matchResult.groupValues[1]}"
+        }
+
+        // Process ordered lists (simple implementation)
+        processed = processed.replace(Regex("<br>(\\d+)\\. ([^<]+)")) { matchResult ->
+            "<br>${matchResult.groupValues[1]}. ${matchResult.groupValues[2]}"
+        }
+
+        return processed
+    }
+
+    /**
      * Add a message to the chat history
      */
     private fun addMessageToChat(sender: String, message: String, cssClass: String) {
         val doc = chatHistoryPane.document as HTMLDocument
         val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-        // Process message to add copy buttons to code blocks
-        val processedMessage = if (cssClass == "assistant") {
-            processCodeBlocks(message)
+        // Process message to format it properly
+        val processedMessage = if (cssClass.startsWith("assistant")) {
+            processMessage(message)
         } else {
-            escapeHtml(message)
+            // For user messages, just handle newlines and escape HTML
+            escapeHtml(message).replace("\n", "<br>")
         }
 
         val html = """
-            <div class="message $cssClass">
-                <div class="message-header">$sender</div>
-                <div class="message-content">$processedMessage</div>
-            </div>
-        """.trimIndent()
+        <div class="message $cssClass">
+            <div class="message-header">$sender</div>
+            <div class="message-content">$processedMessage</div>
+        </div>
+    """.trimIndent()
 
         kit.insertHTML(doc, doc.length, html, 0, 0, null)
 
@@ -528,33 +667,6 @@ class LlmChatToolWindow(private val project: Project) {
         chatHistoryPane.caretPosition = doc.length
     }
 
-    /**
-     * Process the message to add copy buttons to code blocks
-     */
-    private fun processCodeBlocks(message: String): String {
-        // Pattern to match markdown code blocks (both with language specifier and without)
-        val codeBlockPattern = Regex("```([a-zA-Z0-9]*)?\\s*\\n([\\s\\S]*?)\\n```")
-
-        return escapeHtml(message).replace(codeBlockPattern) { matchResult ->
-            val language = matchResult.groupValues[1].trim()
-            val code = matchResult.groupValues[2]
-
-            // Generate a unique ID for this code snippet
-            val codeId = "code-" + UUID.randomUUID().toString()
-
-            // Store the code in our map for later copying
-            codeSnippets[codeId] = code
-
-            // Create HTML with a copy button
-            """
-            <div class="code-block">
-                ${if (language.isNotEmpty()) "<div class=\"code-language\">$language</div>" else ""}
-                <a href="copy:$codeId" class="copy-btn">Copy</a>
-                <pre>$code</pre>
-            </div>
-            """.trimIndent()
-        }
-    }
 
     /**
      * Copy the code snippet with the given ID to the clipboard
@@ -598,11 +710,11 @@ class LlmChatToolWindow(private val project: Project) {
                 val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
                 val html = """
-                    <div class="message assistant">
-                        <div class="message-header">Assistant</div>
-                        <div class="message-content">${processCodeBlocks(newContent)}</div>
-                    </div>
-                """.trimIndent()
+    <div class="message assistant">
+        <div class="message-header">Assistant</div>
+        <div class="message-content">${processMessage(newContent)}</div>
+    </div>
+""".trimIndent()
 
                 kit.insertHTML(doc, startOffset, html, 0, 0, null)
 
