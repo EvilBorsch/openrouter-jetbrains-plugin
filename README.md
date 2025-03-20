@@ -87,6 +87,19 @@ This will download the proper Gradle wrapper JAR file.
 ./gradlew runIde
 ```
 
+## IDE Compatibility
+
+This plugin is compatible with JetBrains IDEs from version 2023.1 (build 231) up to version 2024.3.* (build 243.*).
+
+If you need to install the plugin on a newer IDE version, you'll need to update the compatibility range in the `build.gradle.kts` file:
+
+1. Open `build.gradle.kts`
+2. Find the `patchPluginXml` task
+3. Update the `untilBuild.set("243.*")` line to include your IDE's build number
+4. Rebuild the plugin using `./gradlew buildPlugin`
+
+For example, if you're using IDE version 2025.1 (build 251), change it to `untilBuild.set("251.*")`.
+
 ## Troubleshooting
 
 ### Build Issues

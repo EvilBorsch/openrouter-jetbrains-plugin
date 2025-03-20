@@ -131,174 +131,11 @@ class LlmChatToolWindow(private val project: Project) {
         val editorKit = HTMLEditorKit()
         document = HTMLDocument()
 
-        // Apply CSS styling with dark theme support
-        val styleSheet = editorKit.styleSheet
-        styleSheet.addRule(
-            """
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                margin: 0;
-                padding: 0;
-                background-color: ${if (isDarkTheme()) "#252526" else "#ffffff"};
-                color: ${if (isDarkTheme()) "#d4d4d4" else "#333333"};
-            }
-            
-            .message {
-                margin-bottom: 16px;
-                max-width: 85%;
-                border-radius: 8px;
-                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-                overflow: hidden;
-            }
-            
-            .user {
-                background-color: ${if (isDarkTheme()) "#2b5797" else "#e1f5fe"};
-                color: ${if (isDarkTheme()) "#ffffff" else "#0d47a1"};
-                margin-left: auto;
-                margin-right: 0;
-            }
-            
-            .assistant {
-                background-color: ${if (isDarkTheme()) "#333333" else "#f1f1f1"};
-                color: ${if (isDarkTheme()) "#d4d4d4" else "#333333"};
-                margin-right: auto;
-                margin-left: 0;
-            }
-            
-            .assistant-thinking {
-                background-color: ${if (isDarkTheme()) "#333333" else "#f1f1f1"};
-                color: ${if (isDarkTheme()) "#d4d4d4" else "#333333"};
-                margin-right: auto;
-                margin-left: 0;
-                opacity: 0.7;
-            }
-            
-            .prompt-only {
-                background-color: ${if (isDarkTheme()) "#5c4b00" else "#ffe0b2"};
-                color: ${if (isDarkTheme()) "#f0e6c8" else "#663c00"};
-                margin: 0 auto;
-                max-width: 70%;
-            }
-            
-            .message-header {
-                padding: 6px 12px;
-                font-weight: bold;
-                font-size: 12px;
-                border-bottom: 1px solid ${if (isDarkTheme()) "#444444" else "#e0e0e0"};
-                display: flex;
-                justify-content: space-between;
-            }
-            
-            .cost-badge {
-    background-color: ${if (isDarkTheme()) "#555555" else "#e0e0e0"};
-    border-radius: 4px;
-    padding: 2px 6px;
-    margin-left: 8px;
-    font-size: 11px;
-    font-weight: bold;
-    color: ${if (isDarkTheme()) "#ffffff" else "#333333"};
-    display: inline-block;
-}
-
-            
-            .user .message-header {
-                background-color: ${if (isDarkTheme()) "#1e3e6b" else "#bbdefb"};
-            }
-            
-            .assistant .message-header {
-                background-color: ${if (isDarkTheme()) "#3e3e3e" else "#e0e0e0"};
-            }
-            
-            .assistant-thinking .message-header {
-                background-color: ${if (isDarkTheme()) "#3e3e3e" else "#e0e0e0"};
-            }
-            
-            .prompt-only .message-header {
-                background-color: ${if (isDarkTheme()) "#705c00" else "#ffcc80"};
-            }
-            
-            .message-content {
-                padding: 8px 12px;
-                line-height: 1.5;
-            }
-            
-            pre {
-                white-space: pre-wrap;
-                word-wrap: break-word;
-                margin: 8px 0;
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 12px;
-            }
-            
-            .code-block {
-                position: relative;
-                background-color: ${if (isDarkTheme()) "#1e1e1e" else "#f5f5f5"};
-                border: 1px solid ${if (isDarkTheme()) "#444444" else "#ddd"};
-                border-radius: 4px;
-                padding: 8px 12px;
-                margin: 8px 0;
-                font-family: 'JetBrains Mono', monospace;
-            }
-            
-            .code-language {
-                position: absolute;
-                top: 2px;
-                right: 36px;
-                font-size: 10px;
-                color: ${if (isDarkTheme()) "#a0a0a0" else "#757575"};
-                padding: 2px 6px;
-            }
-            
-            .copy-btn {
-                position: absolute;
-                top: 2px;
-                right: 2px;
-                background-color: ${if (isDarkTheme()) "#3e3e3e" else "#e0e0e0"};
-                color: ${if (isDarkTheme()) "#d4d4d4" else "#333333"};
-                border: none;
-                border-radius: 3px;
-                padding: 2px 6px;
-                font-size: 10px;
-                cursor: pointer;
-            }
-            
-           
-            .copy-btn:hover {
-                background-color: ${if (isDarkTheme()) "#505050" else "#bdbdbd"};
-                color: ${if (isDarkTheme()) "#ffffff" else "#000000"};
-            }
-            
-            
-                .inline-code {
-        font-family: 'JetBrains Mono', Consolas, monospace;
-        background-color: ${if (isDarkTheme()) "#2d2d2d" else "#f0f0f0"};
-        padding: 1px 4px;
-        border-radius: 3px;
-        font-size: 90%;
-    }
-    
-    em {
-        font-style: italic;
-    }
-    
-    strong {
-        font-weight: bold;
-    }
-    
-    ul, ol {
-        margin-left: 20px;
-        margin-top: 5px;
-        margin-bottom: 5px;
-    }
-    
-    li {
-        margin-bottom: 3px;
-    }
-
-        """
-        )
-
+        // Set up basic document and editor kit without CSS styling
         this.editorKit = editorKit
+        
+        // Set background color based on theme
+        background = if (isDarkTheme()) JBColor(Color(0x252526), Color(0x252526)) else JBColor.WHITE
 
         // Add hyperlink listener for code copy functionality
         addHyperlinkListener(object : HyperlinkListener {
@@ -736,56 +573,51 @@ class LlmChatToolWindow(private val project: Project) {
      * Replace the last assistant message with new content
      */
     private fun replaceLastAssistantMessage(newContent: String, generationId: String = "", cost: Double? = null) {
-        val doc = chatHistoryPane.document as HTMLDocument
+        try {
+            val doc = chatHistoryPane.document as HTMLDocument
 
-        if (lastAssistantMessageElement != null) {
-            // Replace the content of the last assistant message
-            val startOffset = lastAssistantMessageElement!!.startOffset
-            val endOffset = lastAssistantMessageElement!!.endOffset
+            if (lastAssistantMessageElement != null) {
+                // Replace the content of the last assistant message
+                val startOffset = lastAssistantMessageElement!!.startOffset
+                val endOffset = lastAssistantMessageElement!!.endOffset
 
-            try {
-                doc.remove(startOffset, endOffset - startOffset)
-                val kit = chatHistoryPane.editorKit as HTMLEditorKit
+                try {
+                    doc.remove(startOffset, endOffset - startOffset)
+                    val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-                // Create cost badge HTML if cost is available
-                val costBadgeHtml = if (cost != null) {
-                    "<span class=\"cost-badge\">$${String.format("%.5f", cost)}</span>"
-                } else {
-                    ""
-                }
+                    // Create a very simple HTML structure with minimal styling
+                    val html = """
+                        <p><b>Assistant</b>${if (cost != null) " ($${String.format("%.5f", cost)})" else ""}</p>
+                        <p>${processMessage(newContent)}</p>
+                        <hr>
+                    """.trimIndent()
 
-                val html = """
-            <div class="message assistant" ${if (generationId.isNotEmpty()) "id=\"msg-$generationId\"" else ""}>
-                <div class="message-header">
-                    <span>Assistant</span>
-                    $costBadgeHtml
-                </div>
-                <div class="message-content">${processMessage(newContent)}</div>
-            </div>
-        """.trimIndent()
+                    kit.insertHTML(doc, startOffset, html, 0, 0, null)
 
-                kit.insertHTML(doc, startOffset, html, 0, 0, null)
+                    // Update the reference to the new element
+                    val root = doc.defaultRootElement
+                    val index = root.getElementIndex(startOffset)
+                    if (index >= 0) {
+                        lastAssistantMessageElement = root.getElement(index)
+                    } else {
+                        lastAssistantMessageElement = null
+                    }
 
-
-                // Update the reference to the new element
-                val root = doc.defaultRootElement
-                val index = root.getElementIndex(startOffset)
-                if (index >= 0) {
-                    lastAssistantMessageElement = root.getElement(index)
-                } else {
+                    // Scroll to bottom
+                    chatHistoryPane.caretPosition = doc.length
+                } catch (e: Exception) {
+                    // Fallback: add as new message
                     lastAssistantMessageElement = null
+                    addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
                 }
-
-                // Scroll to bottom
-                chatHistoryPane.caretPosition = doc.length
-            } catch (e: Exception) {
+            } else {
                 // Fallback: add as new message
-                lastAssistantMessageElement = null
                 addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
             }
-        } else {
-            // Fallback: add as new message
-            addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
+        } catch (e: Exception) {
+            // Log the error but don't crash
+            println("Error replacing assistant message: ${e.message}")
+            e.printStackTrace()
         }
     }
 
@@ -979,63 +811,59 @@ class LlmChatToolWindow(private val project: Project) {
      * Process the message to properly format markdown elements including code blocks
      */
     private fun processMessage(message: String): String {
-        // First, escape HTML
-        var processed = escapeHtml(message)
+        try {
+            // First, escape HTML
+            var processed = escapeHtml(message)
 
-        // Replace newlines with <br> tags to preserve line breaks
-        processed = processed.replace("\n", "<br>")
+            // Replace newlines with <br> tags to preserve line breaks
+            processed = processed.replace("\n", "<br>")
 
-        // Process code blocks
-        val codeBlockPattern = Regex("```([a-zA-Z0-9]*)?\\s*<br>([\\s\\S]*?)<br>```")
-        processed = processed.replace(codeBlockPattern) { matchResult ->
-            val language = matchResult.groupValues[1].trim()
-            // Replace <br> tags back to newlines within code blocks
-            val code = matchResult.groupValues[2].replace("<br>", "\n")
+            // Process code blocks with extremely simple HTML
+            val codeBlockPattern = Regex("```([a-zA-Z0-9]*)?\\s*<br>([\\s\\S]*?)<br>```")
+            processed = processed.replace(codeBlockPattern) { matchResult ->
+                val language = matchResult.groupValues[1].trim()
+                val code = matchResult.groupValues[2].replace("<br>", "\n")
 
-            // Generate a unique ID for this code snippet
-            val codeId = "code-" + UUID.randomUUID().toString()
+                // Generate a unique ID for this code snippet
+                val codeId = "code-" + UUID.randomUUID().toString()
+                codeSnippets[codeId] = code
 
-            // Store the code in our map for later copying
-            codeSnippets[codeId] = code
+                // Create very simple HTML for code blocks
+                """
+                <p><b>Code${if (language.isNotEmpty()) " ($language)" else ""}:</b> <a href="copy:$codeId">[Copy]</a></p>
+                <pre>${code.replace("\n", "<br>")}</pre>
+                """.trimIndent()
+            }
 
-            // Create HTML with a copy button
-            """
-        <div class="code-block">
-            ${if (language.isNotEmpty()) "<div class=\"code-language\">$language</div>" else ""}
-            <a href="copy:$codeId" class="copy-btn">Copy</a>
-            <pre>${code.replace("\n", "<br>")}</pre>
-        </div>
-        """.trimIndent()
+            // Process inline code with minimal styling
+            val inlineCodePattern = Regex("`([^`]+)`")
+            processed = processed.replace(inlineCodePattern) { matchResult ->
+                "<code>${matchResult.groupValues[1]}</code>"
+            }
+
+            // Process basic formatting
+            processed = processed.replace(Regex("\\*\\*([^*]+)\\*\\*")) { matchResult ->
+                "<b>${matchResult.groupValues[1]}</b>"
+            }
+            processed = processed.replace(Regex("\\*([^*]+)\\*")) { matchResult ->
+                "<i>${matchResult.groupValues[1]}</i>"
+            }
+
+            // Process lists with minimal formatting
+            processed = processed.replace(Regex("<br>- ([^<]+)")) { matchResult ->
+                "<br>• ${matchResult.groupValues[1]}"
+            }
+            processed = processed.replace(Regex("<br>(\\d+)\\. ([^<]+)")) { matchResult ->
+                "<br>${matchResult.groupValues[1]}. ${matchResult.groupValues[2]}"
+            }
+
+            return processed
+        } catch (e: Exception) {
+            // If any error occurs during processing, return the original message with basic escaping
+            println("Error processing message: ${e.message}")
+            e.printStackTrace()
+            return escapeHtml(message).replace("\n", "<br>")
         }
-
-        // Process inline code
-        val inlineCodePattern = Regex("`([^`]+)`")
-        processed = processed.replace(inlineCodePattern) { matchResult ->
-            val code = matchResult.groupValues[1]
-            "<span class=\"inline-code\">$code</span>"
-        }
-
-        // Process bold text
-        processed = processed.replace(Regex("\\*\\*([^*]+)\\*\\*")) { matchResult ->
-            "<strong>${matchResult.groupValues[1]}</strong>"
-        }
-
-        // Process italic text
-        processed = processed.replace(Regex("\\*([^*]+)\\*")) { matchResult ->
-            "<em>${matchResult.groupValues[1]}</em>"
-        }
-
-        // Process unordered lists
-        processed = processed.replace(Regex("<br>- ([^<]+)")) { matchResult ->
-            "<br>• ${matchResult.groupValues[1]}"
-        }
-
-        // Process ordered lists (simple implementation)
-        processed = processed.replace(Regex("<br>(\\d+)\\. ([^<]+)")) { matchResult ->
-            "<br>${matchResult.groupValues[1]}. ${matchResult.groupValues[2]}"
-        }
-
-        return processed
     }
 
     /**
@@ -1048,47 +876,43 @@ class LlmChatToolWindow(private val project: Project) {
         generationId: String = "",
         cost: Double? = null
     ) {
-        val doc = chatHistoryPane.document as HTMLDocument
-        val kit = chatHistoryPane.editorKit as HTMLEditorKit
+        try {
+            val doc = chatHistoryPane.document as HTMLDocument
+            val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-        // Process message to format it properly
-        val processedMessage = if (cssClass.startsWith("assistant")) {
-            processMessage(message)
-        } else {
-            // For user messages, just handle newlines and escape HTML
-            escapeHtml(message).replace("\n", "<br>")
+            // Process message to format it properly
+            val processedMessage = if (cssClass.startsWith("assistant")) {
+                processMessage(message)
+            } else {
+                // For user messages, just handle newlines and escape HTML
+                escapeHtml(message).replace("\n", "<br>")
+            }
+
+            // Create a very simple HTML structure with minimal styling
+            val html = """
+                <p><b>$sender</b>${if (cost != null) " ($${String.format("%.5f", cost)})" else ""}</p>
+                <p>$processedMessage</p>
+                <hr>
+            """.trimIndent()
+
+            kit.insertHTML(doc, doc.length, html, 0, 0, null)
+
+            // Store reference to the last assistant message
+            if (cssClass == "assistant-thinking") {
+                val root = doc.defaultRootElement
+                val index = root.elementCount - 1
+                if (index >= 0) {
+                    lastAssistantMessageElement = root.getElement(index)
+                }
+            }
+
+            // Scroll to bottom
+            chatHistoryPane.caretPosition = doc.length
+        } catch (e: Exception) {
+            // Log the error but don't crash
+            println("Error adding message to chat: ${e.message}")
+            e.printStackTrace()
         }
-
-        // Create cost badge HTML if cost is available
-        val costBadgeHtml = if (cost != null) {
-            "<span class=\"cost-badge\">$${String.format("%.5f", cost)}</span>"
-        } else {
-            ""
-        }
-
-        val html = """
-        <div class="message $cssClass" ${if (generationId.isNotEmpty()) "id=\"msg-$generationId\"" else ""}>
-            <div class="message-header">
-                <span>$sender</span>
-                $costBadgeHtml
-            </div>
-            <div class="message-content">$processedMessage</div>
-        </div>
-    """.trimIndent()
-
-        kit.insertHTML(doc, doc.length, html, 0, 0, null)
-
-
-
-        // Store reference to the last assistant message
-        if (cssClass == "assistant-thinking") {
-            val root = doc.defaultRootElement
-            val index = root.elementCount - 1
-            lastAssistantMessageElement = root.getElement(index)
-        }
-
-        // Scroll to bottom
-        chatHistoryPane.caretPosition = doc.length
     }
 
 }
