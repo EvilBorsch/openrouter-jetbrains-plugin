@@ -836,19 +836,42 @@ class LlmChatToolWindow(private val project: Project) {
      * Update the last assistant message with new content
      */
     private var tokenBuffer = StringBuilder()
+    private var isThinking = true  // Track if we're in thinking mode
+    private var tokenCount = 0     // Track number of tokens to batch updates
 
     private fun updateLastAssistantMessage(token: String) {
         try {
-            // Add token to the buffer
+            // Add token to buffers
             tokenBuffer.append(token)
             assistantMessageContent.append(token)
+            tokenCount++
 
-            // Only update UI if there's actual visible content
-            // This prevents empty "Assistant: " messages during thinking phase
-            val content = tokenBuffer.toString().trim()
-            if (content.isNotEmpty() && !content.equals("Assistant: ")) {
-                replaceLastAssistantMessage(assistantMessageContent.toString())
-                tokenBuffer.clear()
+            // Check if we're still in thinking mode
+            if (isThinking) {
+                // If we get meaningful content, transition out of thinking mode
+                val content = tokenBuffer.toString().trim()
+                if (content.isNotEmpty()) {
+                    isThinking = false
+                    SwingUtilities.invokeLater {
+                        // Replace "Thinking..." with the first batch of content
+                        replaceLastAssistantMessage(assistantMessageContent.toString())
+                    }
+                    tokenBuffer.clear()
+                    tokenCount = 0
+                }
+            } else {
+                // Only update UI periodically to avoid spam (every 10 tokens or when we have a sentence)
+                val shouldUpdate = tokenCount >= 10 ||
+                        tokenBuffer.toString().contains(".") ||
+                        tokenBuffer.toString().contains("\n")
+
+                if (shouldUpdate) {
+                    SwingUtilities.invokeLater {
+                        replaceLastAssistantMessage(assistantMessageContent.toString())
+                    }
+                    tokenBuffer.clear()
+                    tokenCount = 0
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -986,13 +1009,15 @@ class LlmChatToolWindow(private val project: Project) {
                     fileContents,
                     object : OpenRouterClient.ResponseCallback {
                         override fun onStart() {
-                            // Clear the token buffer at the start of a new response
+                            // Reset buffers and state
                             tokenBuffer = StringBuilder()
+                            assistantMessageContent = StringBuilder()
+                            isThinking = true
+                            tokenCount = 0
 
-                            // Instead of adding "Thinking..." message right away, just initialize the assistant message content
+                            // Add "Thinking..." message
                             SwingUtilities.invokeLater {
-                                assistantMessageContent = StringBuilder()
-                                lastAssistantMessageElement = null
+                                addMessageToChat("Assistant", "Thinking...", "assistant-thinking")
                             }
                         }
 
@@ -1004,9 +1029,11 @@ class LlmChatToolWindow(private val project: Project) {
                         }
 
                         override fun onComplete(fullResponse: String, generationId: String) {
-                            // Final update to the assistant's message, ensuring we display everything
+                            // Final update with the complete response
                             SwingUtilities.invokeLater {
-                                tokenBuffer.clear() // Clear buffer
+                                tokenBuffer.clear()
+                                tokenCount = 0
+                                isThinking = false
                                 replaceLastAssistantMessage(fullResponse, generationId)
                             }
                         }
