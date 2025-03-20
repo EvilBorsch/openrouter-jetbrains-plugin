@@ -835,10 +835,21 @@ class LlmChatToolWindow(private val project: Project) {
     /**
      * Update the last assistant message with new content
      */
+    private var tokenBuffer = StringBuilder()
+
     private fun updateLastAssistantMessage(token: String) {
         try {
+            // Add token to the buffer
+            tokenBuffer.append(token)
             assistantMessageContent.append(token)
-            replaceLastAssistantMessage(assistantMessageContent.toString())
+
+            // Only update UI if there's actual visible content
+            // This prevents empty "Assistant: " messages during thinking phase
+            val content = tokenBuffer.toString().trim()
+            if (content.isNotEmpty() && !content.equals("Assistant: ")) {
+                replaceLastAssistantMessage(assistantMessageContent.toString())
+                tokenBuffer.clear()
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -975,9 +986,13 @@ class LlmChatToolWindow(private val project: Project) {
                     fileContents,
                     object : OpenRouterClient.ResponseCallback {
                         override fun onStart() {
-                            // Add placeholder for assistant response
+                            // Clear the token buffer at the start of a new response
+                            tokenBuffer = StringBuilder()
+
+                            // Instead of adding "Thinking..." message right away, just initialize the assistant message content
                             SwingUtilities.invokeLater {
-                                addMessageToChat("Assistant", "Thinking...", "assistant-thinking")
+                                assistantMessageContent = StringBuilder()
+                                lastAssistantMessageElement = null
                             }
                         }
 
@@ -989,8 +1004,9 @@ class LlmChatToolWindow(private val project: Project) {
                         }
 
                         override fun onComplete(fullResponse: String, generationId: String) {
-                            // Final update to the assistant's message
+                            // Final update to the assistant's message, ensuring we display everything
                             SwingUtilities.invokeLater {
+                                tokenBuffer.clear() // Clear buffer
                                 replaceLastAssistantMessage(fullResponse, generationId)
                             }
                         }
