@@ -73,6 +73,7 @@ class LlmPluginSettings : PersistentStateComponent<LlmPluginSettings> {
     var availableModels: MutableList<String> = mutableListOf(
         "google/gemini-2.0-flash-thinking-exp:free",
         "anthropic/claude-3.7-sonnet",
+        "anthropic/claude-3.7-sonnet:thinking",
         "deepseek/deepseek-r1",
         "deepseek/deepseek-r1:free",
         "deepseek/deepseek-chat:free",

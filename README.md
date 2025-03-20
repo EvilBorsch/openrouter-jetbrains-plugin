@@ -12,6 +12,14 @@ A JetBrains IDE plugin that allows you to reference project files in prompts sen
 
 ## How to Use
 
+
+### easy installation
+[llmplugin-1.0-SNAPSHOT.zip](build/distributions/llmplugin-1.0-SNAPSHOT.zip)
+
+get zip with plugin and 
+- Go to Settings/Preferences > Plugins
+- Click "Install Plugin from Disk..."
+
 ### Installation
 
 1. Build the plugin from source:
