@@ -228,6 +228,15 @@ class LlmChatToolWindow(private val project: Project) {
                 overflow-x: auto;
             }
             
+                pre, code {
+        white-space: pre-wrap !important;
+        word-wrap: break-word;
+    }
+    
+    pre br, code br {
+        line-height: 1.5em;
+    }
+            
             /* Dark theme specific styles */
             body.dark-theme {
                 background-color: #2B2B2B;
@@ -1073,13 +1082,19 @@ class LlmChatToolWindow(private val project: Project) {
                 codeSnippets[codeId] = code
 
                 // Create a more attractive code block with header
+                // Critical: Replace \n with <br> but preserve the actual newlines as well
+                // This ensures newlines are preserved when selecting with a mouse
+
+                // First convert all newlines to <br>
+                val htmlFormattedCode = escapeHtml(code).replace("\n", "&#10;<br>")
+
                 val codeHtml = """
                 <div class="code-block">
                     <div class="code-header">
                         <span>${language}</span>
                         <a href="copy:$codeId" class="copy-button">Copy</a>
                     </div>
-                    <pre>${escapeHtml(code)}</pre>
+                    <pre style="white-space:pre-wrap; word-wrap:break-word;"><code style="white-space:pre-wrap !important;">$htmlFormattedCode</code></pre>
                 </div>
             """
 
@@ -1095,7 +1110,9 @@ class LlmChatToolWindow(private val project: Project) {
 
             // Process inline code
             processedContent = processedContent.replace(Regex("`([^`]+)`")) { matchResult ->
-                "<code style='background-color:#F0F0F0; padding:2px 4px; border-radius:3px; font-family:\"JetBrains Mono\", monospace;'>${escapeHtml(matchResult.groupValues[1])}</code>"
+                // Use the same approach for inline code to preserve newlines
+                val codeText = escapeHtml(matchResult.groupValues[1]).replace("\n", "&#10;<br>")
+                "<code style='background-color:#F0F0F0; padding:2px 4px; border-radius:3px; font-family:\"JetBrains Mono\", monospace; white-space:pre-wrap;'>$codeText</code>"
             }
 
             // Convert line breaks to <br> tags
