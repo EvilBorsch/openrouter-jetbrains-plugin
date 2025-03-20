@@ -1,4 +1,4 @@
-/* Modern styling for the chat window */
+/* Modern styling for the chat window with improved message distinction */
 
 body {
     font-family: 'JetBrains Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -10,65 +10,71 @@ body {
     color: var(--text-color, #000000);
 }
 
-/* Message container styling - bubble-style chat messages */
-.message-container {
-    margin-bottom: 16px;
-    padding: 14px 16px;
-    border-radius: 18px;
-    overflow: visible;
-    position: relative;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+/* Modern message layout with avatar */
+.chat-message {
+    display: flex;
+    margin: 24px 0;
+    animation: fadeIn 0.3s;
+}
+
+/* Avatar styling */
+.avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: white;
+    margin: 0 12px;
+    flex-shrink: 0;
+}
+
+.user-avatar {
+    background-color: #4285F4;
+}
+
+.assistant-avatar {
+    background-color: #34A853;
+}
+
+/* Message content container */
+.message-content {
     max-width: 80%;
-    animation: fadeIn 0.3s ease;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 
-/* User message alignment and styling */
-.user {
-    background-color: var(--user-msg-bg, #1a73e8);
-    color: var(--user-msg-color, #ffffff);
+/* User message styling */
+.user-message .message-content {
+    background-color: #E3F2FD;
+    border-left: 4px solid #4285F4;
     margin-left: auto;
-    margin-right: 10px;
-    border-top-right-radius: 4px; /* Create chat bubble shape */
-    position: relative;
 }
 
-.user::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: -8px;
-    width: 0;
-    height: 0;
-    border: 8px solid transparent;
-    border-left-color: var(--user-msg-bg, #1a73e8);
-    border-right: 0;
-    border-top: 0;
+/* Assistant message styling */
+.assistant-message .message-content {
+    background-color: white;
+    border-left: 4px solid #34A853;
 }
 
-/* Assistant message alignment and styling */
-.assistant {
-    background-color: var(--assistant-msg-bg, #f5f5f5);
-    color: var(--assistant-msg-color, #212121);
-    margin-right: auto;
-    margin-left: 10px;
-    border-top-left-radius: 4px; /* Create chat bubble shape */
-    position: relative;
+/* Sender name */
+.sender {
+    font-weight: bold;
+    margin-bottom: 6px;
 }
 
-.assistant::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -8px;
-    width: 0;
-    height: 0;
-    border: 8px solid transparent;
-    border-right-color: var(--assistant-msg-bg, #f5f5f5);
-    border-left: 0;
-    border-top: 0;
+.user-message .sender {
+    color: #4285F4;
 }
 
-/* Fade-in animation for messages */
+.assistant-message .sender {
+    color: #34A853;
+}
+
+/* Message animations */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -80,15 +86,7 @@ body {
     }
 }
 
-/* Message sender styling with prominent display */
-.message-sender {
-    font-weight: 600;
-    margin-bottom: 8px;
-    font-size: 13px;
-    color: var(--sender-color, inherit);
-}
-
-/* Cost display styling - highlighted and more visible */
+/* Cost display styling */
 .cost {
     font-weight: 500;
     font-size: 11px;
@@ -101,45 +99,10 @@ body {
     border: 1px solid var(--cost-border-color, rgba(76, 175, 80, 0.2));
 }
 
-.cost::before {
-    content: "💲";
-    margin-right: 3px;
-    font-size: 10px;
-}
-
-/* Message content styling */
-.message-content {
-    line-height: 1.5;
-}
-
-/* Assistant thinking message styling */
-.assistant-thinking {
-    background-color: var(--assistant-thinking-bg, #f5f5f5);
-    color: var(--assistant-thinking-color, #757575);
-    margin-right: auto;
-    margin-left: 10px;
-    border-top-left-radius: 4px;
-    position: relative;
-    opacity: 0.8;
-}
-
-.assistant-thinking::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -8px;
-    width: 0;
-    height: 0;
-    border: 8px solid transparent;
-    border-right-color: var(--assistant-thinking-bg, #f5f5f5);
-    border-left: 0;
-    border-top: 0;
-}
-
-/* Code block styling with better contrast */
+/* Code block styling with proper whitespace preservation */
 pre {
-    background-color: var(--code-bg, rgba(0, 0, 0, 0.05));
-    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+    background-color: var(--code-bg, #f8f9fa);
+    border: 1px solid var(--border-color, #e0e0e0);
     border-radius: 6px;
     padding: 12px;
     margin: 12px 0;
@@ -148,6 +111,9 @@ pre {
     font-size: 12px;
     line-height: 1.4;
     position: relative;
+    /* Critical for preserving newlines and whitespace when copying */
+    white-space: pre !important;
+    tab-size: 4;
 }
 
 .code-block {
@@ -163,8 +129,11 @@ pre {
     justify-content: space-between;
     align-items: center;
     padding: 6px 12px;
-    background-color: var(--code-header-bg, rgba(0, 0, 0, 0.1));
-    border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+    background-color: var(--code-header-bg, #eeeeee);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
 }
 
 /* Code language styling */
@@ -172,6 +141,13 @@ pre {
     font-family: 'JetBrains Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 12px;
     color: var(--code-language-color, rgba(0, 0, 0, 0.7));
+}
+
+/* Code block with header styling */
+.code-block pre {
+    margin-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
 }
 
 /* Inline code styling */
@@ -187,7 +163,7 @@ code {
 .copy-button {
     display: inline-block;
     padding: 3px 8px;
-    background-color: var(--copy-btn-bg, rgba(0, 0, 0, 0.1));
+    background-color: var(--copy-btn-bg, rgba(0, 0, 0, 0.05));
     color: var(--copy-btn-color, #0d47a1);
     border-radius: 4px;
     font-size: 11px;
@@ -198,7 +174,12 @@ code {
 }
 
 .copy-button:hover {
-    background-color: var(--copy-btn-hover-bg, rgba(0, 0, 0, 0.2));
+    background-color: var(--copy-btn-hover-bg, rgba(0, 0, 0, 0.1));
+}
+
+/* Assistant thinking message styling */
+.assistant-thinking {
+    opacity: 0.7;
 }
 
 /* Dark theme variables */
@@ -210,19 +191,22 @@ code {
         --cost-text-color: #81c784;
         --cost-bg-color: rgba(129, 199, 132, 0.1);
         --cost-border-color: rgba(129, 199, 132, 0.2);
-        --user-msg-bg: #0e639c; /* More vibrant blue for user messages in dark mode */
-        --user-msg-color: #ffffff;
-        --assistant-msg-bg: #2d2d2d;
-        --assistant-msg-color: #d4d4d4;
-        --assistant-thinking-bg: #2d2d2d;
-        --assistant-thinking-color: #a0a0a0;
-        --code-bg: #1e1e1e;
-        --code-header-bg: #252526;
+        --code-bg: #2a2a2a;
+        --code-header-bg: #383838;
         --code-language-color: #cccccc;
         --inline-code-bg: rgba(255, 255, 255, 0.1);
-        --sender-color: #d4d4d4;
         --copy-btn-bg: rgba(255, 255, 255, 0.1);
         --copy-btn-color: #88c0d0;
         --copy-btn-hover-bg: rgba(255, 255, 255, 0.2);
+    }
+
+    .user-message .message-content {
+        background-color: #313D4F;
+        border-left-color: #4285F4;
+    }
+
+    .assistant-message .message-content {
+        background-color: #2D2D2D;
+        border-left-color: #34A853;
     }
 }
