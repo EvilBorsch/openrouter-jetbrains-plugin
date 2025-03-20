@@ -44,242 +44,327 @@ class LlmChatToolWindow(private val project: Project) {
     // Map to store code snippets by ID for copy functionality
     private val codeSnippets = mutableMapOf<String, String>()
 
-    // Get settings
-    private val settings = service<LlmPluginSettings>()
+    // Get settings with lazy initialization to avoid early service access
+    private val settings by lazy { service<LlmPluginSettings>() }
 
+    // Initialize the FileReferenceParser lazily
+    private val fileReferenceParser by lazy { FileReferenceParser(project) }
+
+    // Initialize the OpenRouterClient lazily
+    private val openRouterClient by lazy { OpenRouterClient() }
 
     // Model selector combo box
-    private val modelSelectorComboBox = JComboBox<String>().apply {
-        // Add the available models
-        for (model in settings.availableModels) {
-            addItem(model)
-        }
-        // Add custom models
-        for (model in settings.customModels) {
-            addItem(model)
-        }
+    private val modelSelectorComboBox by lazy {
+        JComboBox<String>().apply {
+            // Add the available models
+            for (model in settings.availableModels) {
+                addItem(model)
+            }
+            // Add custom models
+            for (model in settings.customModels) {
+                addItem(model)
+            }
 
-        // Set the selected model
-        selectedItem = settings.selectedModel
+            // Set the selected model
+            selectedItem = settings.selectedModel
 
-        // Listen for changes
-        addActionListener {
-            val selectedModel = selectedItem as String
-            settings.selectedModel = selectedModel
+            // Listen for changes
+            addActionListener {
+                val selectedModel = selectedItem as String
+                settings.selectedModel = selectedModel
+            }
+
+            // Style the combobox
+            maximumSize = Dimension(250, 30)
+            preferredSize = Dimension(250, 30)
+            background =
+                if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
+            foreground =
+                if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
         }
-
-        // Style the combobox
-        maximumSize = Dimension(250, 30)
-        preferredSize = Dimension(250, 30)
-        background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
-        foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
     }
 
-    // Chat context components
-    private val chatContextComboBox = JComboBox<com.example.llmplugin.settings.ChatData>().apply {
-        maximumSize = Dimension(200, 30)
-        preferredSize = Dimension(200, 30)
-        background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
-        foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+    // Lazily initialize all other UI components
+    private val chatContextComboBox by lazy {
+        JComboBox<com.example.llmplugin.settings.ChatData>().apply {
+            maximumSize = Dimension(200, 30)
+            preferredSize = Dimension(200, 30)
+            background =
+                if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
+            foreground =
+                if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
 
-        // Custom renderer to show chat names instead of toString()
-        renderer = object : DefaultListCellRenderer() {
-            override fun getListCellRendererComponent(
-                list: JList<*>?,
-                value: Any?,
-                index: Int,
-                isSelected: Boolean,
-                cellHasFocus: Boolean
-            ): Component {
-                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
-                if (value is com.example.llmplugin.settings.ChatData) {
-                    text = value.name
+            // Custom renderer to show chat names instead of toString()
+            renderer = object : DefaultListCellRenderer() {
+                override fun getListCellRendererComponent(
+                    list: JList<*>?,
+                    value: Any?,
+                    index: Int,
+                    isSelected: Boolean,
+                    cellHasFocus: Boolean
+                ): Component {
+                    super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+                    if (value is com.example.llmplugin.settings.ChatData) {
+                        text = value.name
+                    }
+                    return this
                 }
-                return this
             }
         }
     }
 
-    private val newChatButton = JButton("+").apply {
-        toolTipText = "Create new chat"
-        preferredSize = Dimension(30, 30)
-        background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
-        foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
-        isFocusPainted = false
-        cursor = Cursor(Cursor.HAND_CURSOR)
+    private val newChatButton by lazy {
+        JButton("+").apply {
+            toolTipText = "Create new chat"
+            preferredSize = Dimension(30, 30)
+            background =
+                if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
+            foreground =
+                if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+            isFocusPainted = false
+            cursor = Cursor(Cursor.HAND_CURSOR)
+        }
     }
 
-    private val deleteChatButton = JButton("×").apply {
-        toolTipText = "Delete current chat"
-        preferredSize = Dimension(30, 30)
-        background = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
-        foreground = if (isDarkTheme()) JBColor(
-            Color(0xFF6B68),
-            Color(0xFF6B68)
-        ) else JBColor(Color(0xE53935), Color(0xE53935))
-        isFocusPainted = false
-        cursor = Cursor(Cursor.HAND_CURSOR)
+    private val deleteChatButton by lazy {
+        JButton("×").apply {
+            toolTipText = "Delete current chat"
+            preferredSize = Dimension(30, 30)
+            background =
+                if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D)) else JBColor.WHITE
+            foreground = if (isDarkTheme()) JBColor(
+                Color(0xFF6B68),
+                Color(0xFF6B68)
+            ) else JBColor(Color(0xE53935), Color(0xE53935))
+            isFocusPainted = false
+            cursor = Cursor(Cursor.HAND_CURSOR)
+        }
     }
 
     // Components
-    private val chatHistoryPane = JTextPane().apply {
-        contentType = "text/html"
-        isEditable = false
-        border = EmptyBorder(10, 10, 10, 10)
+    private val chatHistoryPane by lazy {
+        JTextPane().apply {
+            contentType = "text/html"
+            isEditable = false
+            border = EmptyBorder(10, 10, 10, 10)
 
-        // Apply CSS styles
-        val editorKit = HTMLEditorKit()
-        document = HTMLDocument()
+            // Apply CSS styles
+            val editorKit = HTMLEditorKit()
+            document = HTMLDocument()
 
-        // Set up basic document and editor kit without CSS styling
-        this.editorKit = editorKit
-        
-        // Set background color based on theme
-        background = if (isDarkTheme()) JBColor(Color(0x252526), Color(0x252526)) else JBColor.WHITE
+            // Set up document and editor kit with CSS styling
+            this.editorKit = editorKit
 
-        // Add hyperlink listener for code copy functionality
-        addHyperlinkListener(object : HyperlinkListener {
-            override fun hyperlinkUpdate(e: HyperlinkEvent) {
-                if (e.eventType == HyperlinkEvent.EventType.ACTIVATED) {
-                    if (e.description.startsWith("copy:")) {
-                        val codeId = e.description.substring(5)
-                        copyCodeSnippet(codeId)
+            // Set background color based on theme
+            background =
+                if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
+
+            // Add hyperlink listener for code copy functionality
+            addHyperlinkListener(object : HyperlinkListener {
+                override fun hyperlinkUpdate(e: HyperlinkEvent) {
+                    if (e.eventType == HyperlinkEvent.EventType.ACTIVATED) {
+                        if (e.description.startsWith("copy:")) {
+                            val codeId = e.description.substring(5)
+                            copyCodeSnippet(codeId)
+                        }
                     }
                 }
+            })
+
+            // Set font
+            font = JBUI.Fonts.create("JetBrains Sans", 13)
+
+            // Improved CSS loading that handles missing file gracefully
+            try {
+                val styleSheet = editorKit.styleSheet
+                val cssStream = javaClass.classLoader.getResourceAsStream("style.css")
+                if (cssStream != null) {
+                    styleSheet.loadRules(cssStream.reader(), null)
+                    cssStream.close()
+                } else {
+                    // Apply default styles if CSS file is missing
+                    val defaultCss = """
+                        body { font-family: sans-serif; }
+                        .message-container { margin-bottom: 10px; padding: 5px; }
+                        .user { background-color: #e3f2fd; }
+                        .assistant { background-color: #f5f5f5; }
+                        pre { background-color: #f0f0f0; padding: 10px; border-radius: 5px; }
+                    """.trimIndent()
+                    styleSheet.loadRules(defaultCss.reader(), null)
+                }
+            } catch (e: Exception) {
+                // If CSS loading fails, continue without styling
+                e.printStackTrace()
             }
-        })
+        }
     }
 
     // Create scroll pane with custom background color based on theme
-    private val scrollPane = JBScrollPane(chatHistoryPane).apply {
-        border = EmptyBorder(0, 0, 0, 0)
-        verticalScrollBar.unitIncrement = 16
-        background = if (isDarkTheme()) JBColor(Color(0x252526), Color(0x252526)) else JBColor.WHITE
-        chatHistoryPane.background =
-            if (isDarkTheme()) JBColor(Color(0x252526), Color(0x252526)) else JBColor.WHITE
+    private val scrollPane by lazy {
+        JBScrollPane(chatHistoryPane).apply {
+            border = EmptyBorder(0, 0, 0, 0)
+            verticalScrollBar.unitIncrement = 16
+            background =
+                if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
+            chatHistoryPane.background =
+                if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
+        }
     }
 
     // Modern-looking text area for input
-    private val promptTextArea = JTextArea().apply {
-        border = BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(
-                if (isDarkTheme()) JBColor(
-                    Color(0x3E3E3E),
-                    Color(0x3E3E3E)
-                ) else JBColor.LIGHT_GRAY, 1
-            ),
-            BorderFactory.createEmptyBorder(8, 10, 8, 10)
-        )
-        lineWrap = true
-        wrapStyleWord = true
-        rows = 3
-        font = JBUI.Fonts.create(Font.SANS_SERIF, 13)
-        background = if (isDarkTheme()) JBColor(Color(0x333333), Color(0x333333)) else JBColor.WHITE
-        foreground = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
-        caretColor = if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+    private val promptTextArea by lazy {
+        JTextArea().apply {
+            // Create a more modern border with rounded corners
+            val borderColor = if (isDarkTheme()) JBColor(Color(0x3D3D3D), Color(0x3D3D3D))
+            else JBColor(Color(0xDFDFDF), Color(0xDFDFDF))
+            border = BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(borderColor, 1),
+                BorderFactory.createEmptyBorder(10, 12, 10, 12)
+            )
+            lineWrap = true
+            wrapStyleWord = true
+            rows = 3
+            font = JBUI.Fonts.create("JetBrains Sans", 13)
+            background =
+                if (isDarkTheme()) JBColor(Color(0x333333), Color(0x333333)) else JBColor.WHITE
+            foreground =
+                if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
+            caretColor =
+                if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
 
-        // Set placeholder text
-        text = "Type your prompt here (use @file.txt to include file contents)"
-        addFocusListener(object : java.awt.event.FocusAdapter() {
-            override fun focusGained(e: java.awt.event.FocusEvent?) {
-                if (text == "Type your prompt here (use @file.txt to include file contents)") {
-                    text = ""
-                }
-            }
+            // Set placeholder text with a more subtle color
+            text = "Type your prompt here (use @file.txt to include file contents)"
+            foreground = if (isDarkTheme()) JBColor(
+                Color(0x787878),
+                Color(0x787878)
+            ) else JBColor(Color(0x787878), Color(0x787878))
 
-            override fun focusLost(e: java.awt.event.FocusEvent?) {
-                if (text.trim().isEmpty()) {
-                    text = "Type your prompt here (use @file.txt to include file contents)"
+            addFocusListener(object : java.awt.event.FocusAdapter() {
+                override fun focusGained(e: java.awt.event.FocusEvent?) {
+                    if (text == "Type your prompt here (use @file.txt to include file contents)") {
+                        text = ""
+                        foreground = if (isDarkTheme()) JBColor(
+                            Color(0xD4D4D4),
+                            Color(0xD4D4D4)
+                        ) else JBColor.BLACK
+                    }
                 }
-            }
-        })
 
-        // Add key listener for Enter key
-        addKeyListener(object : KeyAdapter() {
-            override fun keyPressed(e: KeyEvent) {
-                if (e.keyCode == KeyEvent.VK_ENTER && !e.isShiftDown) {
-                    e.consume()
-                    sendPrompt()
+                override fun focusLost(e: java.awt.event.FocusEvent?) {
+                    if (text.trim().isEmpty()) {
+                        text = "Type your prompt here (use @file.txt to include file contents)"
+                        foreground =
+                            if (isDarkTheme()) JBColor(
+                                Color(0x787878),
+                                Color(0x787878)
+                            ) else JBColor(
+                                Color(0x787878),
+                                Color(0x787878)
+                            )
+                    }
                 }
-            }
-        })
+            })
+
+            // Add key listener for Enter key
+            addKeyListener(object : KeyAdapter() {
+                override fun keyPressed(e: KeyEvent) {
+                    if (e.keyCode == KeyEvent.VK_ENTER && !e.isShiftDown) {
+                        e.consume()
+                        sendPrompt()
+                    }
+                }
+            })
+        }
     }
 
     // Modern-looking send button with icon support
-    private val sendButton = JButton("Send").apply {
-        preferredSize = Dimension(100, 36)
-        background = if (isDarkTheme()) JBColor(
-            Color(0x0E639C),
-            Color(0x0E639C)
-        ) else JBColor(Color(0x4285F4), Color(0x4285F4))
-        foreground = JBColor.WHITE
-        border = BorderFactory.createEmptyBorder(0, 10, 0, 10)
-        isFocusPainted = false
-        cursor = Cursor(Cursor.HAND_CURSOR)
+    private val sendButton by lazy {
+        JButton("Send").apply {
+            preferredSize = Dimension(100, 36)
 
-        addActionListener { sendPrompt() }
+            // Use JetBrains UI colors for better integration
+            val accentColor = if (isDarkTheme()) JBColor(Color(0x0E639C), Color(0x0E639C))
+            else JBColor(Color(0x4285F4), Color(0x4285F4))
+            val hoverColor = if (isDarkTheme()) JBColor(Color(0x1177BB), Color(0x1177BB))
+            else JBColor(Color(0x3367D6), Color(0x3367D6))
 
-        addMouseListener(object : MouseAdapter() {
-            override fun mouseEntered(e: MouseEvent?) {
-                background =
-                    if (isDarkTheme()) JBColor(Color(0x1177BB), Color(0x1177BB)) else JBColor(
-                        Color(0x3367D6), Color(0x3367D6)
-                    )
-            }
+            background = accentColor
+            foreground = JBColor.WHITE
 
-            override fun mouseExited(e: MouseEvent?) {
-                background =
-                    if (isDarkTheme()) JBColor(Color(0x0E639C), Color(0x0E639C)) else JBColor(
-                        Color(0x4285F4), Color(0x4285F4)
-                    )
-            }
-        })
+            // Create a more modern border with rounded corners
+            border = JBUI.Borders.empty(0, 10)
+            isFocusPainted = false
+            cursor = Cursor(Cursor.HAND_CURSOR)
+
+            // Use JetBrains Sans font for better integration
+            font = JBUI.Fonts.create("JetBrains Sans", 13).asBold()
+
+            addActionListener { sendPrompt() }
+
+            addMouseListener(object : MouseAdapter() {
+                override fun mouseEntered(e: MouseEvent?) {
+                    background = hoverColor
+                }
+
+                override fun mouseExited(e: MouseEvent?) {
+                    background = accentColor
+                }
+            })
+        }
     }
 
     // Checkbox for "Copy prompt only" mode with modern styling
-    private val copyPromptOnlyCheckBox = JBCheckBox("Copy prompt only").apply {
-        toolTipText =
-            "When checked, prompts will be copied to clipboard instead of being sent to OpenRouter"
-        foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
-        isOpaque = false
+    private val copyPromptOnlyCheckBox by lazy {
+        JBCheckBox("Copy prompt only").apply {
+            toolTipText =
+                "When checked, prompts will be copied to clipboard instead of being sent to OpenRouter"
+            foreground =
+                if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
+            isOpaque = false
+        }
     }
 
     // Checkbox for "Include message history" mode
-    private val includeMessageHistoryCheckBox = JBCheckBox("Include message history").apply {
-        toolTipText =
-            "When checked, previous messages will be included in the context sent to the LLM"
-        foreground = if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
-        isOpaque = false
-        isSelected = settings.includeMessageHistory
+    private val includeMessageHistoryCheckBox by lazy {
+        JBCheckBox("Include message history").apply {
+            toolTipText =
+                "When checked, previous messages will be included in the context sent to the LLM"
+            foreground =
+                if (isDarkTheme()) JBColor(Color(0xA0A0A0), Color(0xA0A0A0)) else JBColor.GRAY
+            isOpaque = false
+            isSelected = settings.includeMessageHistory
+        }
     }
 
     // Panel for the notice when copy mode is enabled
-    private val noticePanel = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
-        border = BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(
-                1, 0, 0, 0,
-                if (isDarkTheme()) JBColor(Color(0x3E3E3E), Color(0x3E3E3E)) else JBColor.LIGHT_GRAY
-            ),
-            BorderFactory.createEmptyBorder(8, 10, 8, 10)
-        )
-        background = if (isDarkTheme()) JBColor(
-            Color(0x332700),
-            Color(0x332700)
-        ) else JBColor(Color(0xFFF8E1), Color(0xFFF8E1))
-        isVisible = false
+    private val noticePanel by lazy {
+        JPanel(FlowLayout(FlowLayout.LEFT)).apply {
+            border = BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(
+                    1, 0, 0, 0,
+                    if (isDarkTheme()) JBColor(
+                        Color(0x3E3E3E),
+                        Color(0x3E3E3E)
+                    ) else JBColor.LIGHT_GRAY
+                ),
+                BorderFactory.createEmptyBorder(8, 10, 8, 10)
+            )
+            background = if (isDarkTheme()) JBColor(
+                Color(0x332700),
+                Color(0x332700)
+            ) else JBColor(Color(0xFFF8E1), Color(0xFFF8E1))
+            isVisible = false
 
-        val label =
-            JLabel("Copy mode enabled - messages will be copied to clipboard instead of being sent to API")
-        label.foreground = if (isDarkTheme()) JBColor(
-            Color(0xFFCA28),
-            Color(0xFFCA28)
-        ) else JBColor(Color(0xF57F17), Color(0xF57F17))
-        label.font = JBUI.Fonts.create(Font.SANS_SERIF, 11)
-        add(label)
+            val label =
+                JLabel("Copy mode enabled - messages will be copied to clipboard instead of being sent to API")
+            label.foreground = if (isDarkTheme()) JBColor(
+                Color(0xFFCA28),
+                Color(0xFFCA28)
+            ) else JBColor(Color(0xF57F17), Color(0xF57F17))
+            label.font = JBUI.Fonts.create(Font.SANS_SERIF, 11)
+            add(label)
+        }
     }
-
-    private val fileReferenceParser = FileReferenceParser(project)
-    private val openRouterClient = OpenRouterClient()
 
     // Keep track of the last assistant message element
     private var lastAssistantMessageElement: Element? = null
@@ -289,71 +374,73 @@ class LlmChatToolWindow(private val project: Project) {
     private val fileReferenceRegex = Regex("@([\\w.-/]+)")
 
     init {
-        // Set listener for checkbox to show/hide notice panel
-        copyPromptOnlyCheckBox.addActionListener {
-            noticePanel.isVisible = copyPromptOnlyCheckBox.isSelected
-        }
-
-        // Set listener for include message history checkbox
-        includeMessageHistoryCheckBox.addActionListener {
-            settings.includeMessageHistory = includeMessageHistoryCheckBox.isSelected
-        }
-
-        // Initialize chat context combo box
-        updateChatContextComboBox()
-
-        // Set up chat context combo box listener
-        chatContextComboBox.addActionListener {
-            if (chatContextComboBox.selectedItem != null) {
-                val selectedChat =
-                    chatContextComboBox.selectedItem as com.example.llmplugin.settings.ChatData
-                openRouterClient.switchChat(selectedChat.id)
-                loadChatHistory()
+        try {
+            // Set listener for checkbox to show/hide notice panel
+            copyPromptOnlyCheckBox.addActionListener {
+                noticePanel.isVisible = copyPromptOnlyCheckBox.isSelected
             }
-        }
 
-        // Set up delete chat button
-        deleteChatButton.addActionListener {
-            val currentChat = openRouterClient.getCurrentChat() ?: return@addActionListener
+            // Set listener for include message history checkbox
+            includeMessageHistoryCheckBox.addActionListener {
+                settings.includeMessageHistory = includeMessageHistoryCheckBox.isSelected
+            }
 
-            // Don't allow deleting the default chat
-            if (currentChat.id == "default") {
-                Messages.showWarningDialog(
-                    "The default chat cannot be deleted.",
-                    "Cannot Delete Chat"
+            // Set up chat context combo box listener
+            chatContextComboBox.addActionListener {
+                if (chatContextComboBox.selectedItem != null) {
+                    val selectedChat =
+                        chatContextComboBox.selectedItem as com.example.llmplugin.settings.ChatData
+                    openRouterClient.switchChat(selectedChat.id)
+                    loadChatHistory()
+                }
+            }
+
+            // Set up delete chat button
+            deleteChatButton.addActionListener {
+                val currentChat = openRouterClient.getCurrentChat() ?: return@addActionListener
+
+                // Don't allow deleting the default chat
+                if (currentChat.id == "default") {
+                    Messages.showWarningDialog(
+                        "The default chat cannot be deleted.",
+                        "Cannot Delete Chat"
+                    )
+                    return@addActionListener
+                }
+
+                // Confirm deletion
+                val result = Messages.showYesNoDialog(
+                    "Are you sure you want to delete the chat '${currentChat.name}'?",
+                    "Delete Chat",
+                    Messages.getQuestionIcon()
                 )
-                return@addActionListener
+
+                if (result == Messages.YES) {
+                    openRouterClient.deleteChat(currentChat.id)
+                    updateChatContextComboBox()
+                }
             }
 
-            // Confirm deletion
-            val result = Messages.showYesNoDialog(
-                "Are you sure you want to delete the chat '${currentChat.name}'?",
-                "Delete Chat",
-                Messages.getQuestionIcon()
-            )
-
-            if (result == Messages.YES) {
-                openRouterClient.deleteChat(currentChat.id)
+            // Set up new chat button
+            newChatButton.addActionListener {
+                // Create new chat and refresh UI state
+                val newChatId = openRouterClient.createNewChat()
                 updateChatContextComboBox()
+
+                // Force selection of new chat in the combo box
+                chatContextComboBox.selectedItem = openRouterClient.getCurrentChat()
+                // Clear display and add fresh welcome message
+                clearChatHistory()
+                openRouterClient.addAssistantMessage("New chat started. How can I help you?")
+                addMessageToChat(
+                    "Assistant",
+                    "New chat started. How can I help you?",
+                    "assistant"
+                )
             }
-        }
-
-        // Set up new chat button
-        newChatButton.addActionListener {
-            // Create new chat and refresh UI state
-            val newChatId = openRouterClient.createNewChat()
-            updateChatContextComboBox()
-
-            // Force selection of new chat in the combo box
-            chatContextComboBox.selectedItem = openRouterClient.getCurrentChat()
-            // Clear display and add fresh welcome message
-            clearChatHistory()
-            openRouterClient.addAssistantMessage("New chat started. How can I help you?")
-            addMessageToChat(
-                "Assistant",
-                "New chat started. How can I help you?",
-                "assistant"
-            )
+        } catch (e: Exception) {
+            // Log initialization errors but don't crash
+            e.printStackTrace()
         }
     }
 
@@ -361,64 +448,74 @@ class LlmChatToolWindow(private val project: Project) {
      * Updates the chat context combo box with available chats
      */
     private fun updateChatContextComboBox() {
-        chatContextComboBox.removeAllItems()
+        try {
+            chatContextComboBox.removeAllItems()
 
-        // Add all available chats
-        for (chat in openRouterClient.getAvailableChats()) {
-            chatContextComboBox.addItem(chat)
-        }
-
-        // Select the current chat
-        val currentChatId = openRouterClient.getCurrentChatId()
-        for (i in 0 until chatContextComboBox.itemCount) {
-            val chat = chatContextComboBox.getItemAt(i)
-            if (chat.id == currentChatId) {
-                chatContextComboBox.selectedIndex = i
-                break
+            // Add all available chats
+            for (chat in openRouterClient.getAvailableChats()) {
+                chatContextComboBox.addItem(chat)
             }
-        }
 
-        // Update chat history display
-        loadChatHistory()
+            // Select the current chat
+            val currentChatId = openRouterClient.getCurrentChatId()
+            for (i in 0 until chatContextComboBox.itemCount) {
+                val chat = chatContextComboBox.getItemAt(i)
+                if (chat.id == currentChatId) {
+                    chatContextComboBox.selectedIndex = i
+                    break
+                }
+            }
+
+            // Update chat history display
+            loadChatHistory()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     /**
      * Loads the chat history for the current chat
      */
     private fun loadChatHistory() {
-        // Clear current display
-        clearChatHistory()
+        try {
+            // Clear current display
+            clearChatHistory()
 
-        // Get current chat
-        val chat = openRouterClient.getCurrentChat() ?: return
+            // Get current chat
+            val chat = openRouterClient.getCurrentChat() ?: return
 
-        // Add messages to display
-        for (message in chat.messages) {
-            val sender = if (message.role == "user") "You" else "Assistant"
-            val cssClass = if (message.role == "user") "user" else "assistant"
+            // Add messages to display
+            for (message in chat.messages) {
+                val sender = if (message.role == "user") "You" else "Assistant"
+                val cssClass = if (message.role == "user") "user" else "assistant"
 
-            // Add message with cost if available
-            addMessageToChat(
-                sender,
-                message.content,
-                cssClass,
-                message.generationId ?: "",
-                message.cost
-            )
-
+                // Add message with cost if available
+                addMessageToChat(
+                    sender,
+                    message.content,
+                    cssClass,
+                    message.generationId ?: "",
+                    message.cost
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-
     }
 
     /**
      * Clears the chat history display
      */
     private fun clearChatHistory() {
-        val doc = chatHistoryPane.document as HTMLDocument
-        doc.remove(0, doc.length)
-        lastAssistantMessageElement = null
-        assistantMessageContent = StringBuilder()
-        codeSnippets.clear()
+        try {
+            val doc = chatHistoryPane.document as HTMLDocument
+            doc.remove(0, doc.length)
+            lastAssistantMessageElement = null
+            assistantMessageContent = StringBuilder()
+            codeSnippets.clear()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     /**
@@ -432,132 +529,163 @@ class LlmChatToolWindow(private val project: Project) {
      * Build the main content panel
      */
     fun getContent(): JPanel {
-        val panel = JPanel(BorderLayout())
-        panel.background =
-            if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
+        try {
+            val panel = JPanel(BorderLayout())
+            panel.background =
+                if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
 
-        // Add header panel with title and model selector
-        val headerPanel = JPanel(BorderLayout()).apply {
-            background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
-                Color(0xF5F5F5), Color(0xF5F5F5)
-            )
-            border = MatteBorder(
-                0, 0, 1, 0,
-                if (isDarkTheme()) JBColor(Color(0x3E3E3E), Color(0x3E3E3E)) else JBColor.LIGHT_GRAY
-            )
-            preferredSize = Dimension(0, 40)
-
-            // Left side with title and chat context controls
-            val leftPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
+            // Add header panel with title and model selector
+            val headerPanel = JPanel(BorderLayout()).apply {
                 background =
                     if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
                         Color(0xF5F5F5), Color(0xF5F5F5)
                     )
+                border = MatteBorder(
+                    0, 0, 1, 0,
+                    if (isDarkTheme()) JBColor(
+                        Color(0x3E3E3E),
+                        Color(0x3E3E3E)
+                    ) else JBColor.LIGHT_GRAY
+                )
+                preferredSize = Dimension(0, 40)
 
-                val title = JLabel("LLM Chat")
-                title.font = JBUI.Fonts.create(Font.SANS_SERIF, 14).asBold()
-                title.foreground =
-                    if (isDarkTheme()) JBColor(Color(0xD4D4D4), Color(0xD4D4D4)) else JBColor.BLACK
-                title.border = EmptyBorder(0, 5, 0, 0)
+                // Left side with title and chat context controls
+                val leftPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
+                    background =
+                        if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                            Color(0xF5F5F5), Color(0xF5F5F5)
+                        )
 
-                add(title)
-                add(chatContextComboBox)
-                add(newChatButton)
-                add(deleteChatButton)
+                    val title = JLabel("LLM Chat")
+                    title.font = JBUI.Fonts.create(Font.SANS_SERIF, 14).asBold()
+                    title.foreground =
+                        if (isDarkTheme()) JBColor(
+                            Color(0xD4D4D4),
+                            Color(0xD4D4D4)
+                        ) else JBColor.BLACK
+                    title.border = EmptyBorder(0, 5, 0, 0)
+
+                    add(title)
+                    add(chatContextComboBox)
+                    add(newChatButton)
+                    add(deleteChatButton)
+                }
+
+                add(leftPanel, BorderLayout.WEST)
             }
 
-            add(leftPanel, BorderLayout.WEST)
+            panel.add(headerPanel, BorderLayout.NORTH)
+
+            // Chat history area with scroll
+            panel.add(scrollPane, BorderLayout.CENTER)
+
+            // Input area panel
+            val inputPanel = JPanel(BorderLayout()).apply {
+                background =
+                    if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                        Color(0xF5F5F5), Color(0xF5F5F5)
+                    )
+                border = EmptyBorder(10, 15, 15, 15)
+
+                // Model row
+                val modelRowPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
+                    background =
+                        if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                            Color(0xF5F5F5), Color(0xF5F5F5)
+                        )
+                    add(JLabel("Model:").apply {
+                        foreground = if (isDarkTheme()) JBColor(
+                            Color(0xA0A0A0),
+                            Color(0xA0A0A0)
+                        ) else JBColor.GRAY
+                    })
+                    add(modelSelectorComboBox)
+                }
+
+                // Checkbox row
+                val checkboxRowPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
+                    background =
+                        if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                            Color(0xF5F5F5), Color(0xF5F5F5)
+                        )
+                    border = EmptyBorder(0, 0, 10, 0)
+                    add(copyPromptOnlyCheckBox)
+                    add(includeMessageHistoryCheckBox)
+                }
+
+                // Vertical panel for rows
+                val rowsPanel = JPanel().apply {
+                    layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                    add(modelRowPanel)
+                    add(checkboxRowPanel)
+                }
+
+                // Input field and send button
+                val promptPanel = JPanel(BorderLayout(10, 0)).apply {
+                    background =
+                        if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
+                            Color(0xF5F5F5), Color(0xF5F5F5)
+                        )
+                    add(promptTextArea, BorderLayout.CENTER)
+                    add(sendButton, BorderLayout.EAST)
+                }
+
+                add(rowsPanel, BorderLayout.NORTH)
+                add(promptPanel, BorderLayout.CENTER)
+                add(noticePanel, BorderLayout.SOUTH)
+            }
+
+            panel.add(inputPanel, BorderLayout.SOUTH)
+
+            // Initialize chat contexts and add a welcome message
+            SwingUtilities.invokeLater {
+                try {
+                    // Initialize the chat context combo box
+                    updateChatContextComboBox()
+
+                    // Add a welcome message
+                    addMessageToChat(
+                        "Assistant",
+                        "Hello! I'm your AI assistant. How can I help you today? You can reference files with @filename.ext syntax.",
+                        "assistant"
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            return panel
+        } catch (e: Exception) {
+            // If initialization fails, display error panel
+            e.printStackTrace()
+            val errorPanel = JPanel(BorderLayout())
+            errorPanel.add(
+                JLabel("Error initializing chat window. Please check logs."),
+                BorderLayout.CENTER
+            )
+            return errorPanel
         }
-
-        panel.add(headerPanel, BorderLayout.NORTH)
-
-        panel.add(headerPanel, BorderLayout.NORTH)
-
-        // Chat history area with scroll
-        panel.add(scrollPane, BorderLayout.CENTER)
-
-        // Input area panel
-        val inputPanel = JPanel(BorderLayout()).apply {
-            background = if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
-                Color(0xF5F5F5), Color(0xF5F5F5)
-            )
-            border = EmptyBorder(10, 15, 15, 15)
-
-            // Model row
-            val modelRowPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
-                background =
-                    if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
-                        Color(0xF5F5F5), Color(0xF5F5F5)
-                    )
-                add(JLabel("Model:").apply {
-                    foreground = if (isDarkTheme()) JBColor(
-                        Color(0xA0A0A0),
-                        Color(0xA0A0A0)
-                    ) else JBColor.GRAY
-                })
-                add(modelSelectorComboBox)
-            }
-
-            // Checkbox row
-            val checkboxRowPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
-                background =
-                    if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
-                        Color(0xF5F5F5), Color(0xF5F5F5)
-                    )
-                border = EmptyBorder(0, 0, 10, 0)
-                add(copyPromptOnlyCheckBox)
-                add(includeMessageHistoryCheckBox)
-            }
-
-            // Vertical panel for rows
-            val rowsPanel = JPanel().apply {
-                layout = BoxLayout(this, BoxLayout.Y_AXIS)
-                add(modelRowPanel)
-                add(checkboxRowPanel)
-            }
-
-            // Input field and send button
-            val promptPanel = JPanel(BorderLayout(10, 0)).apply {
-                background =
-                    if (isDarkTheme()) JBColor(Color(0x2D2D2D), Color(0x2D2D2D)) else JBColor(
-                        Color(0xF5F5F5), Color(0xF5F5F5)
-                    )
-                add(promptTextArea, BorderLayout.CENTER)
-                add(sendButton, BorderLayout.EAST)
-            }
-
-            add(rowsPanel, BorderLayout.NORTH)
-            add(promptPanel, BorderLayout.CENTER)
-            add(noticePanel, BorderLayout.SOUTH)
-        }
-
-        panel.add(inputPanel, BorderLayout.SOUTH)
-
-        // Add a welcome message
-        addMessageToChat(
-            "Assistant",
-            "Hello! I'm your AI assistant. How can I help you today? You can reference files with @filename.ext syntax.",
-            "assistant"
-        )
-
-        return panel
     }
 
     /**
      * Copy the code snippet with the given ID to the clipboard
      */
     private fun copyCodeSnippet(codeId: String) {
-        codeSnippets[codeId]?.let { code ->
-            val selection = StringSelection(code)
-            CopyPasteManager.getInstance().setContents(selection)
+        try {
+            codeSnippets[codeId]?.let { code ->
+                val selection = StringSelection(code)
+                CopyPasteManager.getInstance().setContents(selection)
 
-            // Show a notification
-            SwingUtilities.invokeLater {
-                Messages.showInfoMessage(
-                    "Code snippet copied to clipboard.",
-                    "Code Copied"
-                )
+                // Show a notification
+                SwingUtilities.invokeLater {
+                    Messages.showInfoMessage(
+                        "Code snippet copied to clipboard.",
+                        "Code Copied"
+                    )
+                }
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -565,14 +693,22 @@ class LlmChatToolWindow(private val project: Project) {
      * Update the last assistant message with new content
      */
     private fun updateLastAssistantMessage(token: String) {
-        assistantMessageContent.append(token)
-        replaceLastAssistantMessage(assistantMessageContent.toString())
+        try {
+            assistantMessageContent.append(token)
+            replaceLastAssistantMessage(assistantMessageContent.toString())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     /**
      * Replace the last assistant message with new content
      */
-    private fun replaceLastAssistantMessage(newContent: String, generationId: String = "", cost: Double? = null) {
+    private fun replaceLastAssistantMessage(
+        newContent: String,
+        generationId: String = "",
+        cost: Double? = null
+    ) {
         try {
             val doc = chatHistoryPane.document as HTMLDocument
 
@@ -585,12 +721,22 @@ class LlmChatToolWindow(private val project: Project) {
                     doc.remove(startOffset, endOffset - startOffset)
                     val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-                    // Create a very simple HTML structure with minimal styling
+                    // Create a more modern HTML structure with better styling
                     val html = """
-                        <p><b>Assistant</b>${if (cost != null) " ($${String.format("%.5f", cost)})" else ""}</p>
-                        <p>${processMessage(newContent)}</p>
-                        <hr>
-                    """.trimIndent()
+                    <div class="message-container assistant">
+                        <div class="message-header">
+                            <div class="message-sender">Assistant${
+                        if (cost != null) " <span class='cost'>($${
+                            String.format(
+                                "%.5f",
+                                cost
+                            )
+                        })</span>" else ""
+                    }</div>
+                        </div>
+                        <div class="message-content">${processMessage(newContent)}</div>
+                    </div>
+                """.trimIndent()
 
                     kit.insertHTML(doc, startOffset, html, 0, 0, null)
 
@@ -607,6 +753,7 @@ class LlmChatToolWindow(private val project: Project) {
                     chatHistoryPane.caretPosition = doc.length
                 } catch (e: Exception) {
                     // Fallback: add as new message
+                    e.printStackTrace()
                     lastAssistantMessageElement = null
                     addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
                 }
@@ -616,10 +763,16 @@ class LlmChatToolWindow(private val project: Project) {
             }
         } catch (e: Exception) {
             // Log the error but don't crash
-            println("Error replacing assistant message: ${e.message}")
             e.printStackTrace()
+            // Try to add as a new message instead
+            try {
+                addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
+            } catch (innerEx: Exception) {
+                innerEx.printStackTrace()
+            }
         }
     }
+
 
     /**
      * Escape HTML special characters to prevent XSS and rendering issues
@@ -634,136 +787,134 @@ class LlmChatToolWindow(private val project: Project) {
      * Send prompt to the API or copy to clipboard
      */
     private fun sendPrompt() {
-        val promptText = promptTextArea.text
-        // Skip if placeholder text or empty
-        if (promptText.isBlank() || promptText == "Type your prompt here (use @file.txt to include file contents)") return
+        try {
+            val promptText = promptTextArea.text
+            // Skip if placeholder text or empty
+            if (promptText.isBlank() || promptText == "Type your prompt here (use @file.txt to include file contents)") return
 
-        // Add user message to chat
-        addMessageToChat("You", promptText, "user")
+            // Add user message to chat
+            addMessageToChat("You", promptText, "user")
 
-        // Extract file references to preserve the original references
-        val fileReferences = extractFileReferences(promptText)
+            // Extract file references to preserve the original references
+            val fileReferences = extractFileReferences(promptText)
 
-        // Clear input field
-        promptTextArea.text = ""
+            // Clear input field
+            promptTextArea.text = ""
 
-        // Reset assistant message content
-        assistantMessageContent = StringBuilder()
+            // Reset assistant message content
+            assistantMessageContent = StringBuilder()
 
-        // Parse file references
-        val (processedPrompt, fileContents) = fileReferenceParser.parseFileReferences(promptText)
+            // Parse file references
+            val (processedPrompt, fileContents) = fileReferenceParser.parseFileReferences(promptText)
 
-        if (copyPromptOnlyCheckBox.isSelected) {
-            // Create a human-readable prompt for copying
-            val readablePrompt = createReadablePrompt(processedPrompt, fileContents, fileReferences)
+            if (copyPromptOnlyCheckBox.isSelected) {
+                // Create a human-readable prompt for copying
+                val readablePrompt =
+                    createReadablePrompt(processedPrompt, fileContents, fileReferences)
 
-            // Copy to clipboard
-            val selection = StringSelection(readablePrompt)
-            CopyPasteManager.getInstance().setContents(selection)
+                // Copy to clipboard
+                val selection = StringSelection(readablePrompt)
+                CopyPasteManager.getInstance().setContents(selection)
 
-            // Display the prompt in chat
-            addMessageToChat("Prompt (Copied to Clipboard)", readablePrompt, "prompt-only")
+                // Display the prompt in chat
+                addMessageToChat("Prompt (Copied to Clipboard)", readablePrompt, "prompt-only")
 
-            // Notify user
-            SwingUtilities.invokeLater {
-                Messages.showInfoMessage(
-                    "The prompt has been copied to clipboard and was not sent to OpenRouter.",
-                    "Prompt Copied"
-                )
-            }
-        } else {
-            // Send to OpenRouter API
-            openRouterClient.sendPrompt(
-                project,
-                processedPrompt,
-                fileContents,
-                object : OpenRouterClient.ResponseCallback {
-                    override fun onStart() {
-                        // Add placeholder for assistant response
-                        SwingUtilities.invokeLater {
-                            addMessageToChat("Assistant", "Thinking...", "assistant-thinking")
-                        }
-                    }
-
-                    override fun onToken(token: String) {
-                        // Update the assistant's message with the new token
-                        SwingUtilities.invokeLater {
-                            updateLastAssistantMessage(token)
-                        }
-                    }
-
-                    override fun onComplete(fullResponse: String, generationId: String) {
-                        // Final update to the assistant's message
-                        SwingUtilities.invokeLater {
-                            replaceLastAssistantMessage(fullResponse, generationId)
-                        }
-                    }
-
-                    override fun onError(error: String) {
-                        // Show error message
-                        SwingUtilities.invokeLater {
-                            replaceLastAssistantMessage("Error: $error")
-                        }
-                    }
-
-                    override fun onCostUpdate(generationId: String, cost: Double?) {
-                        println("DEBUG: onCostUpdate called with ID: $generationId, cost: $cost")
-                        if (cost != null && generationId.isNotEmpty()) {
+                // Notify user
+                SwingUtilities.invokeLater {
+                    Messages.showInfoMessage(
+                        "The prompt has been copied to clipboard and was not sent to OpenRouter.",
+                        "Prompt Copied"
+                    )
+                }
+            } else {
+                // Send to OpenRouter API
+                openRouterClient.sendPrompt(
+                    project,
+                    processedPrompt,
+                    fileContents,
+                    object : OpenRouterClient.ResponseCallback {
+                        override fun onStart() {
+                            // Add placeholder for assistant response
                             SwingUtilities.invokeLater {
-                                updateMessageCost(generationId, cost)
+                                addMessageToChat("Assistant", "Thinking...", "assistant-thinking")
                             }
                         }
-                    }
-                })
+
+                        override fun onToken(token: String) {
+                            // Update the assistant's message with the new token
+                            SwingUtilities.invokeLater {
+                                updateLastAssistantMessage(token)
+                            }
+                        }
+
+                        override fun onComplete(fullResponse: String, generationId: String) {
+                            // Final update to the assistant's message
+                            SwingUtilities.invokeLater {
+                                replaceLastAssistantMessage(fullResponse, generationId)
+                            }
+                        }
+
+                        override fun onError(error: String) {
+                            // Show error message
+                            SwingUtilities.invokeLater {
+                                replaceLastAssistantMessage("Error: $error")
+                            }
+                        }
+
+                        override fun onCostUpdate(generationId: String, cost: Double?) {
+                            if (cost != null && generationId.isNotEmpty()) {
+                                SwingUtilities.invokeLater {
+                                    updateMessageCost(generationId, cost)
+                                }
+                            }
+                        }
+                    })
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Display error to user
+            Messages.showErrorDialog(
+                "Error sending prompt: ${e.message}",
+                "Error"
+            )
         }
     }
 
-
-
     private fun updateMessageCost(generationId: String, cost: Double) {
-        println("DEBUG: Updating message cost for ID: $generationId, cost: $cost")
-
-
-        // Update the UI
-        SwingUtilities.invokeLater {
-            try {
-                // Find the chat containing this message ID
-                val chat = openRouterClient.getCurrentChat()
-                if (chat != null) {
-                    // Update the cost in the message object
-                    for (message in chat.messages) {
-                        if (message.generationId == generationId) {
-                            message.cost = cost
-                            println("DEBUG: Updated cost in message object: $generationId")
-                            break
+        try {
+            // Update the UI
+            SwingUtilities.invokeLater {
+                try {
+                    // Find the chat containing this message ID
+                    val chat = openRouterClient.getCurrentChat()
+                    if (chat != null) {
+                        // Update the cost in the message object
+                        for (message in chat.messages) {
+                            if (message.generationId == generationId) {
+                                message.cost = cost
+                                break
+                            }
                         }
                     }
+
+                    // Reload the entire chat to show updated costs
+                    // This is a simpler approach than trying to update individual elements
+                    loadChatHistory()
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-
-                // Reload the entire chat to show updated costs
-                // This is a simpler approach than trying to update individual elements
-                loadChatHistory()
-
-                println("DEBUG: Chat history reloaded with costs")
-            } catch (e: Exception) {
-                println("DEBUG: Error updating cost: ${e.message}")
-                e.printStackTrace()
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
     /**
-     * Extract file references from the prompt to preserve the original format
+     * Extract file references from the prompt text
      */
-    private fun extractFileReferences(prompt: String): List<String> {
-        val references = mutableListOf<String>()
-        val matches = fileReferenceRegex.findAll(prompt)
-
-        for (match in matches) {
-            references.add(match.groupValues[1])
-        }
-
-        return references
+    private fun extractFileReferences(text: String): List<String> {
+        val matches = fileReferenceRegex.findAll(text)
+        return matches.map { it.groupValues[1] }.toList()
     }
 
     /**
@@ -775,103 +926,139 @@ class LlmChatToolWindow(private val project: Project) {
         fileReferences: List<String>
     ): String {
         val sb = StringBuilder()
+        sb.append(prompt)
+        sb.append("\n\n")
 
-        // Format system message
-        if (fileContents.isNotEmpty()) {
-            sb.appendLine("I'm sharing the following files with you:")
-            sb.appendLine()
-
-            // Use the original file references with './' prefix
-            for (reference in fileReferences) {
-                if (fileContents.containsKey(reference)) {
-                    // Format as relative path with './' prefix
-                    sb.appendLine("FILE: ./${reference}")
-                    sb.appendLine("```")
-                    sb.appendLine(fileContents[reference])
-                    sb.appendLine("```")
-                    sb.appendLine()
-                }
+        // Add file contents
+        for (fileRef in fileReferences) {
+            val content = fileContents[fileRef]
+            if (content != null) {
+                sb.append("--- File: $fileRef ---\n")
+                sb.append(content)
+                sb.append("\n\n")
             }
-
-            sb.appendLine("Please refer to these files when answering my question.")
-            sb.appendLine()
         }
-
-        // Add the user's prompt, replacing @file references with ./file for clarity
-        val processedPrompt = fileReferenceRegex.replace(prompt) {
-            "./${it.groupValues[1]}"
-        }
-
-        sb.append(processedPrompt)
 
         return sb.toString()
     }
 
     /**
-     * Process the message to properly format markdown elements including code blocks
+     * Process message content for display
      */
-    private fun processMessage(message: String): String {
+    /**
+     * Process message content for display with proper formatting
+     */
+    private fun processMessage(content: String): String {
         try {
-            // First, escape HTML
-            var processed = escapeHtml(message)
+            // Process code blocks
+            var processedContent = content
 
-            // Replace newlines with <br> tags to preserve line breaks
-            processed = processed.replace("\n", "<br>")
+            // Match code blocks with language specification
+            val codeBlockRegex = Regex("```([a-zA-Z0-9_-]*)\\s*\\n([\\s\\S]*?)```")
+            val codeBlocks = codeBlockRegex.findAll(processedContent)
 
-            // Process code blocks with extremely simple HTML
-            val codeBlockPattern = Regex("```([a-zA-Z0-9]*)?\\s*<br>([\\s\\S]*?)<br>```")
-            processed = processed.replace(codeBlockPattern) { matchResult ->
-                val language = matchResult.groupValues[1].trim()
-                val code = matchResult.groupValues[2].replace("<br>", "\n")
+            for (match in codeBlocks) {
+                val language = match.groupValues[1].trim().ifEmpty { "text" }
+                val code = match.groupValues[2]
+                val codeId = UUID.randomUUID().toString()
 
-                // Generate a unique ID for this code snippet
-                val codeId = "code-" + UUID.randomUUID().toString()
+                // Store code for copy functionality
                 codeSnippets[codeId] = code
 
-                // Create very simple HTML for code blocks
-                """
-                <p><b>Code${if (language.isNotEmpty()) " ($language)" else ""}:</b> <a href="copy:$codeId">[Copy]</a></p>
-                <pre>${code.replace("\n", "<br>")}</pre>
-                """.trimIndent()
+                // Create HTML for code block with copy button
+                val codeHtml = """
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-language">$language</span>
+                        <a href="copy:$codeId" class="copy-button">Copy</a>
+                    </div>
+                    <pre><code>${escapeHtml(code)}</code></pre>
+                </div>
+            """.trimIndent()
+
+                processedContent = processedContent.replace(match.value, codeHtml)
             }
 
-            // Process inline code with minimal styling
-            val inlineCodePattern = Regex("`([^`]+)`")
-            processed = processed.replace(inlineCodePattern) { matchResult ->
-                "<code>${matchResult.groupValues[1]}</code>"
+            // Process markdown-style formatting
+            // Bold text: **text** or __text__
+            processedContent =
+                processedContent.replace(Regex("\\*\\*(.*?)\\*\\*|__(.*?)__")) { matchResult ->
+                    val text = matchResult.groupValues[1].ifEmpty { matchResult.groupValues[2] }
+                    "<strong>$text</strong>"
+                }
+
+            // Italic text: *text* or _text_
+            processedContent =
+                processedContent.replace(Regex("\\*(.*?)\\*|_(.*?)_")) { matchResult ->
+                    // Skip if it's likely part of a code example like ArrayList<String>
+                    val text = matchResult.groupValues[1].ifEmpty { matchResult.groupValues[2] }
+                    if (text.contains(Regex("[a-zA-Z0-9]")) && !text.contains(" ")) {
+                        matchResult.value // Return original if likely code
+                    } else {
+                        "<em>$text</em>"
+                    }
+                }
+
+            // Process inline code: `code`
+            processedContent = processedContent.replace(Regex("`([^`]+)`")) { matchResult ->
+                "<code>${escapeHtml(matchResult.groupValues[1])}</code>"
             }
 
-            // Process basic formatting
-            processed = processed.replace(Regex("\\*\\*([^*]+)\\*\\*")) { matchResult ->
-                "<b>${matchResult.groupValues[1]}</b>"
-            }
-            processed = processed.replace(Regex("\\*([^*]+)\\*")) { matchResult ->
-                "<i>${matchResult.groupValues[1]}</i>"
-            }
-
-            // Process lists with minimal formatting
-            processed = processed.replace(Regex("<br>- ([^<]+)")) { matchResult ->
-                "<br>• ${matchResult.groupValues[1]}"
-            }
-            processed = processed.replace(Regex("<br>(\\d+)\\. ([^<]+)")) { matchResult ->
-                "<br>${matchResult.groupValues[1]}. ${matchResult.groupValues[2]}"
+            // Process headers: # Header, ## Header, etc.
+            processedContent = processedContent.replace(
+                Regex(
+                    "^(#{1,6})\\s+(.+)$",
+                    RegexOption.MULTILINE
+                )
+            ) { matchResult ->
+                val level = matchResult.groupValues[1].length
+                val text = matchResult.groupValues[2].trim()
+                "<h$level>$text</h$level>"
             }
 
-            return processed
+            // Process lists
+            // Unordered lists: - item or * item
+            processedContent = processedContent.replace(
+                Regex(
+                    "^(\\s*)[-*]\\s+(.+)$",
+                    RegexOption.MULTILINE
+                )
+            ) { matchResult ->
+                val indent = matchResult.groupValues[1]
+                val text = matchResult.groupValues[2]
+                "$indent• $text"
+            }
+
+            // Ordered lists: 1. item, 2. item, etc.
+            processedContent = processedContent.replace(
+                Regex(
+                    "^(\\s*)(\\d+)\\.\\s+(.+)$",
+                    RegexOption.MULTILINE
+                )
+            ) { matchResult ->
+                val indent = matchResult.groupValues[1]
+                val number = matchResult.groupValues[2]
+                val text = matchResult.groupValues[3]
+                "$indent$number. $text"
+            }
+
+            // Convert line breaks to <br> tags
+            processedContent = processedContent.replace("\n", "<br>")
+
+            return processedContent
         } catch (e: Exception) {
-            // If any error occurs during processing, return the original message with basic escaping
-            println("Error processing message: ${e.message}")
             e.printStackTrace()
-            return escapeHtml(message).replace("\n", "<br>")
+            // Return original content if processing fails, with basic line breaks
+            return content.replace("\n", "<br>")
         }
     }
 
     /**
-     * Add a message to the chat history
+     * Add a message to the chat history with proper styling
      */
     private fun addMessageToChat(
         sender: String,
-        message: String,
+        content: String,
         cssClass: String,
         generationId: String = "",
         cost: Double? = null
@@ -880,25 +1067,27 @@ class LlmChatToolWindow(private val project: Project) {
             val doc = chatHistoryPane.document as HTMLDocument
             val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-            // Process message to format it properly
-            val processedMessage = if (cssClass.startsWith("assistant")) {
-                processMessage(message)
-            } else {
-                // For user messages, just handle newlines and escape HTML
-                escapeHtml(message).replace("\n", "<br>")
-            }
-
-            // Create a very simple HTML structure with minimal styling
+            // Create a more modern HTML structure with better styling
             val html = """
-                <p><b>$sender</b>${if (cost != null) " ($${String.format("%.5f", cost)})" else ""}</p>
-                <p>$processedMessage</p>
-                <hr>
-            """.trimIndent()
+            <div class="message-container $cssClass">
+                <div class="message-header">
+                    <div class="message-sender">$sender${
+                if (cost != null) " <span class='cost'>($${
+                    String.format(
+                        "%.5f",
+                        cost
+                    )
+                })</span>" else ""
+            }</div>
+                </div>
+                <div class="message-content">${processMessage(content)}</div>
+            </div>
+        """.trimIndent()
 
             kit.insertHTML(doc, doc.length, html, 0, 0, null)
 
-            // Store reference to the last assistant message
-            if (cssClass == "assistant-thinking") {
+            // If this is an assistant message, store a reference to it
+            if (cssClass == "assistant" || cssClass == "assistant-thinking") {
                 val root = doc.defaultRootElement
                 val index = root.elementCount - 1
                 if (index >= 0) {
@@ -909,10 +1098,18 @@ class LlmChatToolWindow(private val project: Project) {
             // Scroll to bottom
             chatHistoryPane.caretPosition = doc.length
         } catch (e: Exception) {
-            // Log the error but don't crash
-            println("Error adding message to chat: ${e.message}")
             e.printStackTrace()
+
+            // Fallback simple plain text insertion if HTML insertion fails
+            try {
+                val doc = chatHistoryPane.document
+                doc.insertString(doc.length, "\n$sender: $content\n", null)
+                chatHistoryPane.caretPosition = doc.length
+            } catch (ex: Exception) {
+                ex.printStackTrace()
+            }
         }
     }
-
 }
+
+

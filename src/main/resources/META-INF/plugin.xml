@@ -30,18 +30,18 @@
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Tool Window for the chat UI -->
-        <toolWindow id="LLM Chat" secondary="true" icon="AllIcons.General.Modified" anchor="right"
-                    factoryClass="com.example.llmplugin.toolwindow.LlmChatToolWindowFactory"/>
-        
+        <!-- Tool Window for the chat UI - Fixed icon reference -->
+        <toolWindow id="LLM Chat" secondary="true" icon="AllIcons.General.MessageInfo" anchor="right"
+            factoryClass="com.example.llmplugin.toolwindow.LlmChatToolWindowFactory"/>
+
         <!-- Application settings -->
         <applicationConfigurable
-                parentId="tools"
-                instance="com.example.llmplugin.settings.LlmPluginSettingsConfigurable"
-                id="com.example.llmplugin.settings.LlmPluginSettingsConfigurable"
-                displayName="LLM Plugin Settings"/>
-        
+            parentId="tools"
+            instance="com.example.llmplugin.settings.LlmPluginSettingsConfigurable"
+            id="com.example.llmplugin.settings.LlmPluginSettingsConfigurable"
+            displayName="LLM Plugin Settings"/>
+
         <applicationService
-                serviceImplementation="com.example.llmplugin.settings.LlmPluginSettings"/>
+            serviceImplementation="com.example.llmplugin.settings.LlmPluginSettings"/>
     </extensions>
 </idea-plugin>
