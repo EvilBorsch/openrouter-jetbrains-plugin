@@ -151,13 +151,65 @@ class LlmChatToolWindow(private val project: Project) {
             // Apply CSS styles
             val editorKit = HTMLEditorKit()
             document = HTMLDocument()
-
-            // Set up document and editor kit with CSS styling
             this.editorKit = editorKit
 
             // Set background color based on theme
-            background =
-                if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
+            background = if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
+
+            // Add inline CSS to ensure styling works
+            val styleSheet = editorKit.styleSheet
+            val inlineCSS = """
+            .message-container { 
+                margin-bottom: 16px; 
+                padding: 14px 16px; 
+                border-radius: 18px; 
+                position: relative; 
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); 
+                max-width: 80%; 
+            }
+            .user { 
+                background-color: #1a73e8; 
+                color: white; 
+                margin-left: auto; 
+                margin-right: 10px; 
+                border-top-right-radius: 4px; 
+            }
+            .assistant { 
+                background-color: #f5f5f5; 
+                color: #212121; 
+                margin-right: auto; 
+                margin-left: 10px; 
+                border-top-left-radius: 4px; 
+            }
+            .cost { 
+                font-weight: 500; 
+                font-size: 11px; 
+                color: #4caf50; 
+                margin-left: 8px; 
+                padding: 3px 8px; 
+                background-color: rgba(76, 175, 80, 0.1); 
+                border-radius: 10px; 
+                display: inline-block; 
+                border: 1px solid rgba(76, 175, 80, 0.2); 
+            }
+            .message-sender { 
+                font-weight: 600; 
+                margin-bottom: 8px; 
+                font-size: 13px; 
+            }
+        """
+            styleSheet.addRule(inlineCSS)
+
+            // Try to load external CSS file if available
+            try {
+                val cssStream = javaClass.classLoader.getResourceAsStream("style.css")
+                if (cssStream != null) {
+                    styleSheet.loadRules(cssStream.reader(), null)
+                    cssStream.close()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
 
             // Add hyperlink listener for code copy functionality
             addHyperlinkListener(object : HyperlinkListener {
@@ -173,29 +225,6 @@ class LlmChatToolWindow(private val project: Project) {
 
             // Set font
             font = JBUI.Fonts.create("JetBrains Sans", 13)
-
-            // Improved CSS loading that handles missing file gracefully
-            try {
-                val styleSheet = editorKit.styleSheet
-                val cssStream = javaClass.classLoader.getResourceAsStream("style.css")
-                if (cssStream != null) {
-                    styleSheet.loadRules(cssStream.reader(), null)
-                    cssStream.close()
-                } else {
-                    // Apply default styles if CSS file is missing
-                    val defaultCss = """
-                        body { font-family: sans-serif; }
-                        .message-container { margin-bottom: 10px; padding: 5px; }
-                        .user { background-color: #e3f2fd; }
-                        .assistant { background-color: #f5f5f5; }
-                        pre { background-color: #f0f0f0; padding: 10px; border-radius: 5px; }
-                    """.trimIndent()
-                    styleSheet.loadRules(defaultCss.reader(), null)
-                }
-            } catch (e: Exception) {
-                // If CSS loading fails, continue without styling
-                e.printStackTrace()
-            }
         }
     }
 
@@ -721,21 +750,18 @@ class LlmChatToolWindow(private val project: Project) {
                     doc.remove(startOffset, endOffset - startOffset)
                     val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-                    // Create a more modern HTML structure with better styling
+                    // Create a more modern HTML structure with bubble-style chat
                     val html = """
-                    <div class="message-container assistant">
-                        <div class="message-header">
-                            <div class="message-sender">Assistant${
-                        if (cost != null) " <span class='cost'>($${
-                            String.format(
-                                "%.5f",
-                                cost
-                            )
-                        })</span>" else ""
+                <div class="message-container assistant">
+                    <div class="message-header">
+                        <div class="message-sender">Assistant${
+                        if (cost != null)
+                            " <span class='cost'>$${String.format("%.5f", cost)}</span>"
+                        else ""
                     }</div>
-                        </div>
-                        <div class="message-content">${processMessage(newContent)}</div>
                     </div>
+                    <div class="message-content">${processMessage(newContent)}</div>
+                </div>
                 """.trimIndent()
 
                     kit.insertHTML(doc, startOffset, html, 0, 0, null)
@@ -1067,21 +1093,18 @@ class LlmChatToolWindow(private val project: Project) {
             val doc = chatHistoryPane.document as HTMLDocument
             val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-            // Create a more modern HTML structure with better styling
+            // Create a more modern HTML structure with bubble-style chat messages
             val html = """
-            <div class="message-container $cssClass">
-                <div class="message-header">
-                    <div class="message-sender">$sender${
-                if (cost != null) " <span class='cost'>($${
-                    String.format(
-                        "%.5f",
-                        cost
-                    )
-                })</span>" else ""
+        <div class="message-container $cssClass">
+            <div class="message-header">
+                <div class="message-sender">$sender${
+                if (cost != null)
+                    " <span class='cost'>$${String.format("%.5f", cost)}</span>"
+                else ""
             }</div>
-                </div>
-                <div class="message-content">${processMessage(content)}</div>
             </div>
+            <div class="message-content">${processMessage(content)}</div>
+        </div>
         """.trimIndent()
 
             kit.insertHTML(doc, doc.length, html, 0, 0, null)

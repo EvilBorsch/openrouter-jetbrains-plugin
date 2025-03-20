@@ -1,4 +1,4 @@
-/* Enhanced styling for the chat window with better message formatting */
+/* Modern styling for the chat window */
 
 body {
     font-family: 'JetBrains Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -10,44 +10,101 @@ body {
     color: var(--text-color, #000000);
 }
 
-/* Message container styling */
+/* Message container styling - bubble-style chat messages */
 .message-container {
     margin-bottom: 16px;
-    padding: 12px 16px;
-    border-radius: 8px;
-    overflow: hidden;
+    padding: 14px 16px;
+    border-radius: 18px;
+    overflow: visible;
     position: relative;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+    max-width: 80%;
+    animation: fadeIn 0.3s ease;
 }
 
-.message-container:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 3px 5px rgba(0, 0, 0, 0.15);
+/* User message alignment and styling */
+.user {
+    background-color: var(--user-msg-bg, #1a73e8);
+    color: var(--user-msg-color, #ffffff);
+    margin-left: auto;
+    margin-right: 10px;
+    border-top-right-radius: 4px; /* Create chat bubble shape */
+    position: relative;
 }
 
-/* Message header styling */
-.message-header {
-    margin-bottom: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.user::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -8px;
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+    border-left-color: var(--user-msg-bg, #1a73e8);
+    border-right: 0;
+    border-top: 0;
 }
 
-/* Message sender styling */
+/* Assistant message alignment and styling */
+.assistant {
+    background-color: var(--assistant-msg-bg, #f5f5f5);
+    color: var(--assistant-msg-color, #212121);
+    margin-right: auto;
+    margin-left: 10px;
+    border-top-left-radius: 4px; /* Create chat bubble shape */
+    position: relative;
+}
+
+.assistant::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -8px;
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+    border-right-color: var(--assistant-msg-bg, #f5f5f5);
+    border-left: 0;
+    border-top: 0;
+}
+
+/* Fade-in animation for messages */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Message sender styling with prominent display */
 .message-sender {
     font-weight: 600;
+    margin-bottom: 8px;
     font-size: 13px;
     color: var(--sender-color, inherit);
 }
 
-/* Cost display styling */
+/* Cost display styling - highlighted and more visible */
 .cost {
-    font-weight: normal;
+    font-weight: 500;
     font-size: 11px;
-    color: #888;
-    margin-left: 5px;
-    opacity: 0.7;
+    color: var(--cost-text-color, #4caf50);
+    margin-left: 8px;
+    padding: 3px 8px;
+    background-color: var(--cost-bg-color, rgba(76, 175, 80, 0.1));
+    border-radius: 10px;
+    display: inline-block;
+    border: 1px solid var(--cost-border-color, rgba(76, 175, 80, 0.2));
+}
+
+.cost::before {
+    content: "💲";
+    margin-right: 3px;
+    font-size: 10px;
 }
 
 /* Message content styling */
@@ -55,53 +112,31 @@ body {
     line-height: 1.5;
 }
 
-/* User message styling - more distinct to differentiate from assistant */
-.user {
-    background-color: var(--user-msg-bg, #e3f2fd);
-    color: var(--user-msg-color, #0d47a1);
-    margin-left: 20%;
-    margin-right: 0;
-    border-top-left-radius: 12px;
-    border-bottom-left-radius: 12px;
-    border-left: 3px solid var(--user-border, #2196f3);
-}
-
-/* Assistant message styling - more distinct from user */
-.assistant {
-    background-color: var(--assistant-msg-bg, #f5f5f5);
-    color: var(--assistant-msg-color, #212121);
-    margin-right: 20%;
-    margin-left: 0;
-    border-top-right-radius: 12px;
-    border-bottom-right-radius: 12px;
-    border-right: 3px solid var(--assistant-border, #9e9e9e);
-}
-
 /* Assistant thinking message styling */
 .assistant-thinking {
     background-color: var(--assistant-thinking-bg, #f5f5f5);
     color: var(--assistant-thinking-color, #757575);
-    margin-right: 20%;
-    margin-left: 0;
-    border-top-right-radius: 12px;
-    border-bottom-right-radius: 12px;
-    border-right: 3px solid var(--assistant-border, #9e9e9e);
+    margin-right: auto;
+    margin-left: 10px;
+    border-top-left-radius: 4px;
+    position: relative;
     opacity: 0.8;
 }
 
-/* Prompt-only message styling */
-.prompt-only {
-    background-color: var(--prompt-only-bg, #fff8e1);
-    color: var(--prompt-only-color, #f57f17);
-    margin-right: 20%;
-    margin-left: 0;
-    border-radius: 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    border-left: 3px solid var(--prompt-border, #ffc107);
+.assistant-thinking::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -8px;
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+    border-right-color: var(--assistant-thinking-bg, #f5f5f5);
+    border-left: 0;
+    border-top: 0;
 }
 
-/* Code block styling */
+/* Code block styling with better contrast */
 pre {
     background-color: var(--code-bg, rgba(0, 0, 0, 0.05));
     border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
@@ -113,7 +148,6 @@ pre {
     font-size: 12px;
     line-height: 1.4;
     position: relative;
-    transition: background-color 0.2s ease;
 }
 
 .code-block {
@@ -167,144 +201,28 @@ code {
     background-color: var(--copy-btn-hover-bg, rgba(0, 0, 0, 0.2));
 }
 
-/* Typography */
-strong, b {
-    font-weight: 600;
-    color: var(--heading-color, inherit);
-}
-
-h1, h2, h3, h4, h5, h6 {
-    margin-top: 16px;
-    margin-bottom: 8px;
-    font-weight: 600;
-    line-height: 1.25;
-    color: var(--heading-color, inherit);
-}
-
-h1 { font-size: 18px; }
-h2 { font-size: 16px; }
-h3 { font-size: 14px; }
-
-ul, ol {
-    padding-left: 20px;
-    margin-top: 8px;
-    margin-bottom: 8px;
-}
-
-/* Bullet points */
-li {
-    margin-bottom: 4px;
-}
-
-/* Links styling */
-a {
-    color: var(--link-color, #2196f3);
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-a:hover {
-    color: var(--link-hover-color, #1976d2);
-    text-decoration: underline;
-}
-
-/* Blockquote styling */
-blockquote {
-    border-left: 3px solid var(--blockquote-border, #e0e0e0);
-    margin: 10px 0;
-    padding: 8px 16px;
-    background-color: var(--blockquote-bg, rgba(0, 0, 0, 0.02));
-    color: var(--blockquote-color, inherit);
-    font-style: italic;
-}
-
-/* Table styling */
-table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 15px 0;
-    font-size: 12px;
-}
-
-th, td {
-    border: 1px solid var(--table-border, #e0e0e0);
-    padding: 8px 12px;
-    text-align: left;
-}
-
-th {
-    background-color: var(--table-header-bg, rgba(0, 0, 0, 0.05));
-    font-weight: 600;
-}
-
-tr:nth-child(even) {
-    background-color: var(--table-row-alt, rgba(0, 0, 0, 0.02));
-}
-
-/* Syntax highlighting */
-.keyword { color: #0000ff; }
-.string { color: #008000; }
-.comment { color: #808080; font-style: italic; }
-.number { color: #0000ff; }
-.operator { color: #000000; }
-.type { color: #008080; }
-
 /* Dark theme variables */
 @media (prefers-color-scheme: dark) {
     :root {
         --background-color: #1e1e1e;
         --text-color: #d4d4d4;
         --border-color: rgba(255, 255, 255, 0.1);
-        --input-bg-color: #2d2d2d;
-        --input-field-bg: #333333;
-        --accent-color: #0e639c;
-        --accent-hover-color: #1177bb;
-        --accent-active-color: #1486d5;
-
-        /* Message styling */
-        --user-msg-bg: #0d293e;
-        --user-msg-color: #d4d4d4;
-        --user-border: #1177bb;
+        --cost-text-color: #81c784;
+        --cost-bg-color: rgba(129, 199, 132, 0.1);
+        --cost-border-color: rgba(129, 199, 132, 0.2);
+        --user-msg-bg: #0e639c; /* More vibrant blue for user messages in dark mode */
+        --user-msg-color: #ffffff;
         --assistant-msg-bg: #2d2d2d;
         --assistant-msg-color: #d4d4d4;
-        --assistant-border: #4d4d4d;
         --assistant-thinking-bg: #2d2d2d;
         --assistant-thinking-color: #a0a0a0;
-        --prompt-only-bg: #332700;
-        --prompt-only-color: #ffca28;
-        --prompt-border: #b38f00;
-
-        /* Code styling */
         --code-bg: #1e1e1e;
         --code-header-bg: #252526;
         --code-language-color: #cccccc;
         --inline-code-bg: rgba(255, 255, 255, 0.1);
-
-        /* Typography */
-        --heading-color: #d4d4d4;
         --sender-color: #d4d4d4;
-        --link-color: #61afef;
-        --link-hover-color: #7cbeff;
-
-        /* UI elements */
         --copy-btn-bg: rgba(255, 255, 255, 0.1);
         --copy-btn-color: #88c0d0;
         --copy-btn-hover-bg: rgba(255, 255, 255, 0.2);
-
-        /* Content elements */
-        --blockquote-border: #4d4d4d;
-        --blockquote-bg: rgba(255, 255, 255, 0.05);
-        --blockquote-color: #bbbbbb;
-        --table-border: #4d4d4d;
-        --table-header-bg: #252526;
-        --table-row-alt: rgba(255, 255, 255, 0.03);
     }
-
-    /* Dark theme syntax highlighting */
-    .keyword { color: #cc7832; }
-    .string { color: #6a8759; }
-    .comment { color: #808080; font-style: italic; }
-    .number { color: #6897bb; }
-    .operator { color: #a9b7c6; }
-    .type { color: #507874; }
 }
