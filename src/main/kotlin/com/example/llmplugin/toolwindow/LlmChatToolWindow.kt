@@ -144,32 +144,43 @@ class LlmChatToolWindow(private val project: Project) {
     // Components
     // In your chatHistoryPane initialization
     // In your chatHistoryPane initialization
+    // In your chatHistoryPane initialization
     private val chatHistoryPane by lazy {
         JTextPane().apply {
             contentType = "text/html"
             isEditable = false
             border = EmptyBorder(10, 10, 10, 10)
 
-            // Set background to grey
-            background = if (isDarkTheme()) JBColor(Color(0x2B2B2B), Color(0x2B2B2B))
-            else JBColor(Color(0xF0F0F0), Color(0xF0F0F0))
+            // Set dark background explicitly if in dark theme
+            if (isDarkTheme()) {
+                background = JBColor(Color(0x2B2B2B), Color(0x2B2B2B))
+                foreground = JBColor(Color(0xBBBBBB), Color(0xBBBBBB))
+            } else {
+                background = JBColor(Color(0xF0F0F0), Color(0xF0F0F0))
+                foreground = JBColor(Color(0x333333), Color(0x333333))
+            }
 
-            // Apply CSS styles with improved design
+            // Apply CSS styles with improved design and dark theme support
             val editorKit = HTMLEditorKit()
             document = HTMLDocument()
             this.editorKit = editorKit
 
-            // Add improved stylesheet for better visual appearance
+            // Add stylesheet with explicit dark theme support
             val styleSheet = editorKit.styleSheet
+
+            // Set global styles
             styleSheet.addRule("""
             body { 
                 font-family: 'JetBrains Sans', sans-serif; 
                 margin: 10px;
                 padding: 0;
-                background-color: #F0F0F0;
+                ${if (isDarkTheme()) "background-color: #2B2B2B; color: #BBBBBB;"
+            else "background-color: #F0F0F0; color: #333333;"}
             }
-            
-            /* Message container with improved design */
+        """)
+
+            // Message container styling
+            styleSheet.addRule("""
             .message-container {
                 display: block;
                 position: relative;
@@ -177,107 +188,89 @@ class LlmChatToolWindow(private val project: Project) {
                 max-width: 85%;
                 clear: both;
             }
-            
-            /* User message styling - modern and attractive */
+        """)
+
+            // User message styling
+            styleSheet.addRule("""
             .user-bubble {
                 float: right;
-                background-color: #E3F2FD;
-                color: #1A1A1A;
+                ${if (isDarkTheme())
+                "background-color: #313D4F; color: #FFFFFF;"
+            else
+                "background-color: #E3F2FD; color: #1A1A1A;"}
                 border-radius: 18px 18px 4px 18px;
                 padding: 12px 16px;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+                box-shadow: 0 1px 2px rgba(0,0,0,0.2);
                 margin-left: 50px;
             }
-            
-            /* Assistant message styling - modern and attractive */
+        """)
+
+            // Assistant message styling
+            styleSheet.addRule("""
             .assistant-bubble {
                 float: left;
-                background-color: #FFFFFF;
-                color: #1A1A1A;
+                ${if (isDarkTheme())
+                "background-color: #3C3F41; color: #FFFFFF;"
+            else
+                "background-color: #FFFFFF; color: #1A1A1A;"}
                 border-radius: 18px 18px 18px 4px;
                 padding: 12px 16px;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+                box-shadow: 0 1px 2px rgba(0,0,0,0.2);
                 margin-right: 50px;
             }
-            
-            /* Message sender style */
+        """)
+
+            // Message sender styling
+            styleSheet.addRule("""
             .sender {
                 font-weight: bold;
                 margin-bottom: 8px;
                 font-size: 14px;
+                ${if (isDarkTheme())
+                ".user-bubble & { color: #82AAFF; } .assistant-bubble & { color: #C3E88D; }"
+            else
+                ".user-bubble & { color: #1565C0; } .assistant-bubble & { color: #2E7D32; }"}
             }
-            
-            .user-bubble .sender {
-                color: #1565C0;
-            }
-            
-            .assistant-bubble .sender {
-                color: #2E7D32;
-            }
-            
-            /* Code blocks with proper formatting */
+        """)
+
+            // Code block styling
+            styleSheet.addRule("""
             pre {
-                background-color: #F8F9FA;
-                border: 1px solid #E0E0E0;
+                ${if (isDarkTheme())
+                "background-color: #2A2A2A; border: 1px solid #424242; color: #A9B7C6;"
+            else
+                "background-color: #F8F9FA; border: 1px solid #E0E0E0; color: #333333;"}
                 border-radius: 8px;
                 padding: 12px;
                 margin: 10px 0;
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 13px;
-                white-space: pre !important;
+                white-space: pre-wrap !important;
+                word-wrap: break-word;
                 overflow-x: auto;
             }
-            
-                pre, code {
-        white-space: pre-wrap !important;
-        word-wrap: break-word;
-    }
-    
-    pre br, code br {
-        line-height: 1.5em;
-    }
-            
-            /* Dark theme specific styles */
-            body.dark-theme {
-                background-color: #2B2B2B;
-            }
-            
-            .dark-theme .user-bubble {
-                background-color: #313D4F;
-                color: #FFFFFF;
-            }
-            
-            .dark-theme .assistant-bubble {
-                background-color: #3C3F41;
-                color: #FFFFFF;
-            }
-            
-            .dark-theme pre {
-                background-color: #2A2A2A;
-                border-color: #424242;
-                color: #BBBBBB;
-            }
-            
-            /* Code header styling */
+        """)
+
+            // Code header styling
+            styleSheet.addRule("""
             .code-header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 padding: 8px 12px;
-                background-color: #EEEEEE;
+                ${if (isDarkTheme())
+                "background-color: #383838; border: 1px solid #424242; color: #BBBBBB;"
+            else
+                "background-color: #EEEEEE; border: 1px solid #E0E0E0; color: #555555;"}
                 border-top-left-radius: 8px;
                 border-top-right-radius: 8px;
-                border: 1px solid #E0E0E0;
                 border-bottom: none;
                 font-size: 12px;
             }
-            
-            .dark-theme .code-header {
-                background-color: #383838;
-                border-color: #424242;
-                color: #BBBBBB;
-            }
-            
+        """)
+
+            // Code block with header
+            styleSheet.addRule("""
             .code-block {
                 margin: 10px 0;
             }
@@ -287,16 +280,33 @@ class LlmChatToolWindow(private val project: Project) {
                 border-top-left-radius: 0;
                 border-top-right-radius: 0;
             }
-            
+        """)
+
+            // Copy button styling
+            styleSheet.addRule("""
             .copy-button {
-                color: #1565C0;
+                ${if (isDarkTheme())
+                "color: #64B5F6;"
+            else
+                "color: #1565C0;"}
                 cursor: pointer;
                 text-decoration: underline;
                 font-size: 12px;
             }
-            
-            .dark-theme .copy-button {
-                color: #64B5F6;
+        """)
+
+            // Inline code styling
+            styleSheet.addRule("""
+            code {
+                ${if (isDarkTheme())
+                "background-color: #383838; color: #A9B7C6;"
+            else
+                "background-color: #F0F0F0; color: #333333;"}
+                padding: 2px 4px;
+                border-radius: 3px;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 90%;
+                white-space: pre-wrap !important;
             }
         """)
 
@@ -318,14 +328,20 @@ class LlmChatToolWindow(private val project: Project) {
     }
 
     // Create scroll pane with custom background color based on theme
+    // Create scroll pane with correct background color for dark theme
     private val scrollPane by lazy {
         JBScrollPane(chatHistoryPane).apply {
             border = EmptyBorder(0, 0, 0, 0)
             verticalScrollBar.unitIncrement = 16
-            background =
-                if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
-            chatHistoryPane.background =
-                if (isDarkTheme()) JBColor(Color(0x1E1E1E), Color(0x1E1E1E)) else JBColor.WHITE
+
+            // Set background explicitly based on theme
+            if (isDarkTheme()) {
+                background = JBColor(Color(0x2B2B2B), Color(0x2B2B2B))
+                viewport.background = JBColor(Color(0x2B2B2B), Color(0x2B2B2B))
+            } else {
+                background = JBColor(Color(0xF0F0F0), Color(0xF0F0F0))
+                viewport.background = JBColor(Color(0xF0F0F0), Color(0xF0F0F0))
+            }
         }
     }
 
@@ -639,8 +655,16 @@ class LlmChatToolWindow(private val project: Project) {
     /**
      * Check if dark theme is active in the IDE
      */
+    /**
+     * Check if dark theme is active in the IDE
+     */
     private fun isDarkTheme(): Boolean {
-        return UIUtil.isUnderDarcula()
+        // Multiple checks to ensure accurate theme detection
+        return UIUtil.isUnderDarcula() ||
+                JBColor.isBright() == false ||
+                UIManager.getColor("Panel.background")?.let {
+                    it.red < 100 && it.green < 100 && it.blue < 100
+                } ?: false
     }
 
     /**
@@ -832,6 +856,7 @@ class LlmChatToolWindow(private val project: Project) {
             val doc = chatHistoryPane.document as HTMLDocument
 
             if (lastAssistantMessageElement != null) {
+                // Replace the content of the last assistant message
                 val startOffset = lastAssistantMessageElement!!.startOffset
                 val endOffset = lastAssistantMessageElement!!.endOffset
 
@@ -839,16 +864,13 @@ class LlmChatToolWindow(private val project: Project) {
                     doc.remove(startOffset, endOffset - startOffset)
                     val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-                    // Determine if we're in dark theme
-                    val themeClass = if (isDarkTheme()) "dark-theme" else "light-theme"
-
                     // Create updated HTML with improved style
                     val costDisplay = if (cost != null)
-                        " <span style='color:#4CAF50; font-size:12px; background-color:rgba(76,175,80,0.1); padding:3px 6px; border-radius:10px; margin-left:6px;'>$${String.format("%.5f", cost)}</span>"
+                        " <span style='color:${if (isDarkTheme()) "#81C784" else "#4CAF50"}; font-size:12px; background-color:rgba(76,175,80,0.1); padding:3px 6px; border-radius:10px; margin-left:6px;'>$${String.format("%.5f", cost)}</span>"
                     else ""
 
                     val html = """
-                <div class="message-container $themeClass">
+                <div class="message-container">
                     <div class="assistant-bubble">
                         <div class="sender">Assistant$costDisplay</div>
                         <div class="content">${processMessage(newContent)}</div>
@@ -871,15 +893,19 @@ class LlmChatToolWindow(private val project: Project) {
                     // Scroll to bottom
                     chatHistoryPane.caretPosition = doc.length
                 } catch (e: Exception) {
+                    // Fallback: add as new message
                     e.printStackTrace()
                     lastAssistantMessageElement = null
                     addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
                 }
             } else {
+                // Fallback: add as new message
                 addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
             }
         } catch (e: Exception) {
+            // Log the error but don't crash
             e.printStackTrace()
+            // Try to add as a new message instead
             try {
                 addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
             } catch (innerEx: Exception) {
@@ -887,7 +913,6 @@ class LlmChatToolWindow(private val project: Project) {
             }
         }
     }
-
 
 
     /**
@@ -1103,10 +1128,11 @@ class LlmChatToolWindow(private val project: Project) {
 
             // Process markdown-style formatting
             // Bold text
-            processedContent = processedContent.replace(Regex("\\*\\*(.*?)\\*\\*|__(.*?)__")) { matchResult ->
-                val text = matchResult.groupValues[1].ifEmpty { matchResult.groupValues[2] }
-                "<strong>$text</strong>"
-            }
+            processedContent =
+                processedContent.replace(Regex("\\*\\*(.*?)\\*\\*|__(.*?)__")) { matchResult ->
+                    val text = matchResult.groupValues[1].ifEmpty { matchResult.groupValues[2] }
+                    "<strong>$text</strong>"
+                }
 
             // Process inline code
             processedContent = processedContent.replace(Regex("`([^`]+)`")) { matchResult ->
@@ -1139,18 +1165,15 @@ class LlmChatToolWindow(private val project: Project) {
             val doc = chatHistoryPane.document as HTMLDocument
             val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-            // Determine if we're in dark theme
-            val themeClass = if (isDarkTheme()) "dark-theme" else "light-theme"
-
             // Create a more visually appealing message
             val bubbleClass = if (cssClass == "user") "user-bubble" else "assistant-bubble"
 
             val costDisplay = if (cost != null)
-                " <span style='color:#4CAF50; font-size:12px; background-color:rgba(76,175,80,0.1); padding:3px 6px; border-radius:10px; margin-left:6px;'>$${String.format("%.5f", cost)}</span>"
+                " <span style='color:${if (isDarkTheme()) "#81C784" else "#4CAF50"}; font-size:12px; background-color:rgba(76,175,80,0.1); padding:3px 6px; border-radius:10px; margin-left:6px;'>$${String.format("%.5f", cost)}</span>"
             else ""
 
             val html = """
-        <div class="message-container $themeClass">
+        <div class="message-container">
             <div class="$bubbleClass">
                 <div class="sender">$sender$costDisplay</div>
                 <div class="content">${processMessage(content)}</div>
