@@ -145,6 +145,7 @@ class LlmChatToolWindow(private val project: Project) {
     // In your chatHistoryPane initialization
     // In your chatHistoryPane initialization
     // In your chatHistoryPane initialization
+    // In your chatHistoryPane initialization
     private val chatHistoryPane by lazy {
         JTextPane().apply {
             contentType = "text/html"
@@ -160,155 +161,16 @@ class LlmChatToolWindow(private val project: Project) {
                 foreground = JBColor(Color(0x333333), Color(0x333333))
             }
 
-            // Apply CSS styles with improved design and dark theme support
+            // Apply basic HTML setup
             val editorKit = HTMLEditorKit()
             document = HTMLDocument()
             this.editorKit = editorKit
 
-            // Add stylesheet with explicit dark theme support
+            // Add basic stylesheet
             val styleSheet = editorKit.styleSheet
 
-            // Set global styles
-            styleSheet.addRule("""
-            body { 
-                font-family: 'JetBrains Sans', sans-serif; 
-                margin: 10px;
-                padding: 0;
-                ${if (isDarkTheme()) "background-color: #2B2B2B; color: #BBBBBB;"
-            else "background-color: #F0F0F0; color: #333333;"}
-            }
-        """)
-
-            // Message container styling
-            styleSheet.addRule("""
-            .message-container {
-                display: block;
-                position: relative;
-                margin: 20px 0;
-                max-width: 85%;
-                clear: both;
-            }
-        """)
-
-            // User message styling
-            styleSheet.addRule("""
-            .user-bubble {
-                float: right;
-                ${if (isDarkTheme())
-                "background-color: #313D4F; color: #FFFFFF;"
-            else
-                "background-color: #E3F2FD; color: #1A1A1A;"}
-                border-radius: 18px 18px 4px 18px;
-                padding: 12px 16px;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-                margin-left: 50px;
-            }
-        """)
-
-            // Assistant message styling
-            styleSheet.addRule("""
-            .assistant-bubble {
-                float: left;
-                ${if (isDarkTheme())
-                "background-color: #3C3F41; color: #FFFFFF;"
-            else
-                "background-color: #FFFFFF; color: #1A1A1A;"}
-                border-radius: 18px 18px 18px 4px;
-                padding: 12px 16px;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-                margin-right: 50px;
-            }
-        """)
-
-            // Message sender styling
-            styleSheet.addRule("""
-            .sender {
-                font-weight: bold;
-                margin-bottom: 8px;
-                font-size: 14px;
-                ${if (isDarkTheme())
-                ".user-bubble & { color: #82AAFF; } .assistant-bubble & { color: #C3E88D; }"
-            else
-                ".user-bubble & { color: #1565C0; } .assistant-bubble & { color: #2E7D32; }"}
-            }
-        """)
-
-            // Code block styling
-            styleSheet.addRule("""
-            pre {
-                ${if (isDarkTheme())
-                "background-color: #2A2A2A; border: 1px solid #424242; color: #A9B7C6;"
-            else
-                "background-color: #F8F9FA; border: 1px solid #E0E0E0; color: #333333;"}
-                border-radius: 8px;
-                padding: 12px;
-                margin: 10px 0;
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 13px;
-                white-space: pre-wrap !important;
-                word-wrap: break-word;
-                overflow-x: auto;
-            }
-        """)
-
-            // Code header styling
-            styleSheet.addRule("""
-            .code-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 8px 12px;
-                ${if (isDarkTheme())
-                "background-color: #383838; border: 1px solid #424242; color: #BBBBBB;"
-            else
-                "background-color: #EEEEEE; border: 1px solid #E0E0E0; color: #555555;"}
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                border-bottom: none;
-                font-size: 12px;
-            }
-        """)
-
-            // Code block with header
-            styleSheet.addRule("""
-            .code-block {
-                margin: 10px 0;
-            }
-            
-            .code-block pre {
-                margin-top: 0;
-                border-top-left-radius: 0;
-                border-top-right-radius: 0;
-            }
-        """)
-
-            // Copy button styling
-            styleSheet.addRule("""
-            .copy-button {
-                ${if (isDarkTheme())
-                "color: #64B5F6;"
-            else
-                "color: #1565C0;"}
-                cursor: pointer;
-                text-decoration: underline;
-                font-size: 12px;
-            }
-        """)
-
-            // Inline code styling
-            styleSheet.addRule("""
-            code {
-                ${if (isDarkTheme())
-                "background-color: #383838; color: #A9B7C6;"
-            else
-                "background-color: #F0F0F0; color: #333333;"}
-                padding: 2px 4px;
-                border-radius: 3px;
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 90%;
-                white-space: pre-wrap !important;
-            }
-        """)
+            // Basic body styling
+            styleSheet.addRule("body { font-family: sans-serif; margin: 10px; padding: 0; }")
 
             // Add hyperlink listener for code copy functionality
             addHyperlinkListener(object : HyperlinkListener {
@@ -802,7 +664,7 @@ class LlmChatToolWindow(private val project: Project) {
             e.printStackTrace()
             val errorPanel = JPanel(BorderLayout())
             errorPanel.add(
-                JLabel("Error initializing chat window. Please check logs."),
+                JTextField("Error initializing chat window. Please check logs. ${e.stackTraceToString()}"),
                 BorderLayout.CENTER
             )
             return errorPanel
@@ -881,65 +743,48 @@ class LlmChatToolWindow(private val project: Project) {
     /**
      * Replace the last assistant message with new content
      */
+    // In LlmChatToolWindow.kt
     private fun replaceLastAssistantMessage(
         newContent: String,
         generationId: String = "",
         cost: Double? = null
     ) {
         try {
+            // Check if content is empty and skip updating if it is
+            if (newContent.isBlank()) {
+                println("Debug - Skipping update with blank content")
+                return
+            }
+
             val doc = chatHistoryPane.document as HTMLDocument
 
             if (lastAssistantMessageElement != null) {
-                // Replace the content of the last assistant message
-                val startOffset = lastAssistantMessageElement!!.startOffset
-                val endOffset = lastAssistantMessageElement!!.endOffset
-
                 try {
-                    doc.remove(startOffset, endOffset - startOffset)
-                    val kit = chatHistoryPane.editorKit as HTMLEditorKit
+                    // Get the processed content before removing anything
+                    val processedContent = processMessage(newContent)
+                    println("Debug - Processed content length: ${processedContent.length}")
 
-                    // Create updated HTML with improved style
-                    val costDisplay = if (cost != null)
-                        " <span style='color:${if (isDarkTheme()) "#81C784" else "#4CAF50"}; font-size:12px; background-color:rgba(76,175,80,0.1); padding:3px 6px; border-radius:10px; margin-left:6px;'>$${String.format("%.5f", cost)}</span>"
-                    else ""
-
-                    val html = """
-                <div class="message-container">
-                    <div class="assistant-bubble">
-                        <div class="sender">Assistant$costDisplay</div>
-                        <div class="content">${processMessage(newContent)}</div>
-                    </div>
-                    <div style="clear:both;"></div>
-                </div>
-                """
-
-                    kit.insertHTML(doc, startOffset, html, 0, 0, null)
-
-                    // Update the reference to the new element
-                    val root = doc.defaultRootElement
-                    val index = root.getElementIndex(startOffset)
-                    if (index >= 0) {
-                        lastAssistantMessageElement = root.getElement(index)
-                    } else {
-                        lastAssistantMessageElement = null
+                    // Only proceed if we have actual content to insert
+                    if (processedContent.isNotBlank()) {
+                        // SAFER APPROACH: Instead of removing and reinserting,
+                        // just add a new message and set the last reference
+                        addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
+                        return
                     }
-
-                    // Scroll to bottom
-                    chatHistoryPane.caretPosition = doc.length
                 } catch (e: Exception) {
-                    // Fallback: add as new message
                     e.printStackTrace()
+                    println("Debug - Error processing message: ${e.message}")
                     lastAssistantMessageElement = null
                     addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
+                    return
                 }
             } else {
                 // Fallback: add as new message
                 addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
             }
         } catch (e: Exception) {
-            // Log the error but don't crash
             e.printStackTrace()
-            // Try to add as a new message instead
+            println("Debug - Critical error in replaceLastAssistantMessage: ${e.message}")
             try {
                 addMessageToChat("Assistant", newContent, "assistant", generationId, cost)
             } catch (innerEx: Exception) {
@@ -1034,7 +879,19 @@ class LlmChatToolWindow(private val project: Project) {
                                 tokenBuffer.clear()
                                 tokenCount = 0
                                 isThinking = false
-                                replaceLastAssistantMessage(fullResponse, generationId)
+
+                                // Use the accumulated content if available
+                                val finalContent = when {
+                                    fullResponse.isNotBlank() -> fullResponse
+                                    assistantMessageContent.isNotEmpty() -> assistantMessageContent.toString()
+                                    else -> "I've completed processing your request."
+                                }
+
+                                // Debug the response
+                                println("Debug - Complete response length: ${finalContent.length}")
+
+                                // Instead of replacing, just add a new message
+                                addMessageToChat("Assistant", finalContent, "assistant", generationId)
                             }
                         }
 
@@ -1132,6 +989,9 @@ class LlmChatToolWindow(private val project: Project) {
     /**
      * Process message content for display with proper formatting
      */
+    /**
+     * Process message content for display with proper formatting
+     */
     private fun processMessage(content: String): String {
         try {
             // Process code blocks
@@ -1149,27 +1009,30 @@ class LlmChatToolWindow(private val project: Project) {
                 // Store code for copy functionality
                 codeSnippets[codeId] = code
 
-                // Create a more attractive code block with header
-                // Critical: Replace \n with <br> but preserve the actual newlines as well
-                // This ensures newlines are preserved when selecting with a mouse
+                // Create a code block with simpler styling
+                val bgColor = if (isDarkTheme()) "#2A2A2A" else "#F8F9FA"
+                val headerBgColor = if (isDarkTheme()) "#383838" else "#EEEEEE"
+                val borderColor = if (isDarkTheme()) "#424242" else "#E0E0E0"
+                val textColor = if (isDarkTheme()) "#A9B7C6" else "#333333"
+                val linkColor = if (isDarkTheme()) "#64B5F6" else "#1565C0"
 
-                // First convert all newlines to <br>
-                val htmlFormattedCode = escapeHtml(code).replace("\n", "&#10;<br>")
+                // Format code with HTML escaping but simpler styling
+                val htmlFormattedCode = escapeHtml(code).replace("\n", "<br>")
 
                 val codeHtml = """
-                <div class="code-block">
-                    <div class="code-header">
-                        <span>${language}</span>
-                        <a href="copy:$codeId" class="copy-button">Copy</a>
-                    </div>
-                    <pre style="white-space:pre-wrap; word-wrap:break-word;"><code style="white-space:pre-wrap !important;">$htmlFormattedCode</code></pre>
+            <div style="margin: 10px 0;">
+                <div style="padding: 8px 12px; background-color: $headerBgColor; border: 1px solid $borderColor; border-bottom: none;">
+                    <span>$language</span>
+                    <a href="copy:$codeId" style="color: $linkColor; text-decoration: underline; font-size: 12px; float: right;">Copy</a>
                 </div>
+                <pre style="background-color: $bgColor; border: 1px solid $borderColor; padding: 12px; margin: 0; font-family: monospace; font-size: 13px; color: $textColor;">$htmlFormattedCode</pre>
+            </div>
             """
 
                 processedContent = processedContent.replace(match.value, codeHtml)
             }
 
-            // Process markdown-style formatting
+            // Process markdown-style formatting with simpler styling
             // Bold text
             processedContent =
                 processedContent.replace(Regex("\\*\\*(.*?)\\*\\*|__(.*?)__")) { matchResult ->
@@ -1177,11 +1040,13 @@ class LlmChatToolWindow(private val project: Project) {
                     "<strong>$text</strong>"
                 }
 
-            // Process inline code
+            // Process inline code with simpler styling
+            val inlineCodeBgColor = if (isDarkTheme()) "#383838" else "#F0F0F0"
+            val inlineCodeColor = if (isDarkTheme()) "#A9B7C6" else "#333333"
+
             processedContent = processedContent.replace(Regex("`([^`]+)`")) { matchResult ->
-                // Use the same approach for inline code to preserve newlines
-                val codeText = escapeHtml(matchResult.groupValues[1]).replace("\n", "&#10;<br>")
-                "<code style='background-color:#F0F0F0; padding:2px 4px; border-radius:3px; font-family:\"JetBrains Mono\", monospace; white-space:pre-wrap;'>$codeText</code>"
+                val codeText = escapeHtml(matchResult.groupValues[1])
+                "<code style=\"background-color: $inlineCodeBgColor; color: $inlineCodeColor; padding: 2px 4px; font-family: monospace; font-size: 90%;\">$codeText</code>"
             }
 
             // Convert line breaks to <br> tags
@@ -1197,6 +1062,9 @@ class LlmChatToolWindow(private val project: Project) {
     /**
      * Add a message to the chat history with proper styling
      */
+    /**
+     * Add a message to the chat history with proper styling
+     */
     private fun addMessageToChat(
         sender: String,
         content: String,
@@ -1208,23 +1076,40 @@ class LlmChatToolWindow(private val project: Project) {
             val doc = chatHistoryPane.document as HTMLDocument
             val kit = chatHistoryPane.editorKit as HTMLEditorKit
 
-            // Create a more visually appealing message
-            val bubbleClass = if (cssClass == "user") "user-bubble" else "assistant-bubble"
+            // Create a more visually appealing message with simpler styling
+            // that's compatible with Swing's HTML renderer
+            val bgColor = if (cssClass == "user") {
+                if (isDarkTheme()) "#313D4F" else "#E3F2FD"
+            } else {
+                if (isDarkTheme()) "#3C3F41" else "#FFFFFF"
+            }
 
-            val costDisplay = if (cost != null)
-                " <span style='color:${if (isDarkTheme()) "#81C784" else "#4CAF50"}; font-size:12px; background-color:rgba(76,175,80,0.1); padding:3px 6px; border-radius:10px; margin-left:6px;'>$${String.format("%.5f", cost)}</span>"
-            else ""
+            val textColor = if (isDarkTheme()) "#FFFFFF" else "#1A1A1A"
+            val senderColor = if (cssClass == "user") {
+                if (isDarkTheme()) "#82AAFF" else "#1565C0"
+            } else {
+                if (isDarkTheme()) "#C3E88D" else "#2E7D32"
+            }
 
+            // Format cost display with simpler styling
+            val costDisplay = if (cost != null) {
+                val costColor = if (isDarkTheme()) "#81C784" else "#4CAF50"
+                " <span style=\"color: $costColor; font-size: 12px;\">$${String.format("%.5f", cost)}</span>"
+            } else ""
+
+            // Build HTML with simplified styling
             val html = """
-        <div class="message-container">
-            <div class="$bubbleClass">
-                <div class="sender">$sender$costDisplay</div>
-                <div class="content">${processMessage(content)}</div>
+        <div style="margin: 20px 0;">
+            <div style="background-color: $bgColor; color: $textColor; padding: 12px 16px; 
+                        ${if (cssClass == "user") "float: right; margin-left: 50px;" else "float: left; margin-right: 50px;"}">
+                <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px; color: $senderColor;">$sender$costDisplay</div>
+                <div>${processMessage(content)}</div>
             </div>
-            <div style="clear:both;"></div>
+            <div style="clear: both;"></div>
         </div>
         """
 
+            // Insert the HTML
             kit.insertHTML(doc, doc.length, html, 0, 0, null)
 
             // If this is an assistant message, store a reference to it
@@ -1241,6 +1126,7 @@ class LlmChatToolWindow(private val project: Project) {
         } catch (e: Exception) {
             e.printStackTrace()
             try {
+                // Fallback to simple text insertion if HTML fails
                 val doc = chatHistoryPane.document
                 doc.insertString(doc.length, "\n$sender: $content\n", null)
                 chatHistoryPane.caretPosition = doc.length

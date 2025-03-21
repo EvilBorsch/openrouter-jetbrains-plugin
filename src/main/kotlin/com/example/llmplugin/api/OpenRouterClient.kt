@@ -286,23 +286,23 @@ class OpenRouterClient {
                                 // Stream is complete
                                 break
                             }
-                            
+
                             try {
                                 // Parse the JSON chunk
                                 val streamResponse = streamAdapter.fromJson(data)
-                                
+
                                 if (streamResponse != null) {
                                     // Store the generation ID if this is the first chunk
                                     if (generationId.isEmpty()) {
                                         generationId = streamResponse.id
                                         assistantMessage.generationId = generationId
                                     }
-                                    
+
                                     // Process each choice in the response
                                     for (choice in streamResponse.choices) {
                                         // Get the content delta
                                         val content = choice.delta.content
-                                        
+
                                         // If there's content, add it to the response and notify the callback
                                         if (content != null) {
                                             fullResponseBuilder.append(content)
@@ -312,7 +312,46 @@ class OpenRouterClient {
                                 }
                             } catch (e: Exception) {
                                 println("Error parsing stream chunk: ${e.message}")
-                                // Continue processing even if one chunk fails
+
+                                // Check if this might be an error response
+                                try {
+                                    // Try to parse as a regular JSON object to see if it contains an error
+                                    val errorAdapter = moshi.adapter(Map::class.java)
+                                    val errorResponse = errorAdapter.fromJson(data)
+
+                                    if (errorResponse != null && (errorResponse.containsKey("error") || errorResponse.containsKey("errors"))) {
+                                        // Extract error message
+                                        val errorMessage = when {
+                                            errorResponse.containsKey("error") -> {
+                                                if (errorResponse["error"] is Map<*, *>) {
+                                                    val errorObj = errorResponse["error"] as Map<*, *>
+                                                    errorObj["message"]?.toString() ?: "Unknown API error"
+                                                } else {
+                                                    errorResponse["error"]?.toString() ?: "Unknown API error"
+                                                }
+                                            }
+                                            errorResponse.containsKey("errors") -> {
+                                                val errors = errorResponse["errors"]
+                                                if (errors is List<*> && errors.isNotEmpty()) {
+                                                    errors[0]?.toString() ?: "Unknown API error"
+                                                } else {
+                                                    "Unknown API error"
+                                                }
+                                            }
+                                            else -> "Unknown API error"
+                                        }
+
+                                        // Notify about the error and stop processing
+                                        callback.onError("API Error: $errorMessage")
+                                        return
+                                    }
+                                } catch (parseException: Exception) {
+                                    // If we also failed to parse as error, just log and continue processing
+                                    println("Failed to parse as error response: ${parseException.message}")
+                                }
+
+                                // For non-error chunks that fail to parse, continue processing
+                                println("Skipping malformed chunk and continuing")
                             }
                         }
                     }
